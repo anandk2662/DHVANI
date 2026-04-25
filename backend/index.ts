@@ -9,6 +9,10 @@ const app = express();
 await connectDB();
 app.use(cors());
 app.use(express.json());
+
+app.get("/",(req,res)=>{
+    res.send("working woooh!!");
+})
 app.use("/api/users", userRoutes);
 
 app.listen(PORT, () => console.log(`server running on port ${PORT} `))

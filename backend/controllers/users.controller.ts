@@ -111,7 +111,13 @@ const refresh=asyncHandler(async(req:Request,res:Response)=>{
     }
 
     const newAccessToken=generateAccessToken(user.id);
-    res.json({accessToken:newAccessToken})
+    const newRefreshToken=generateAccessToken(user.id);
+
+    await db
+        .update(users)
+        .set({refreshToken:newRefreshToken})
+        .where(eq(users.id,user.id))
+    res.json({accessToken:newAccessToken,refreshToken:newRefreshToken})
 })
 
 
