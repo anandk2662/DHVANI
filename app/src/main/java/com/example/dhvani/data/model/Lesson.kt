@@ -38,7 +38,28 @@ sealed class LessonStep {
 
     @Serializable
     data class Camera(
-        val targetSign: SignItem
+        val targetSign: SignItem,
+        val hint: String? = null
+    ) : LessonStep()
+
+    @Serializable
+    data class FillBlank(
+        val sentence: String, // e.g., "Hello, my name is [BLANK]"
+        val answerSign: SignItem,
+        val options: List<SignItem>
+    ) : LessonStep()
+
+    @Serializable
+    data class Rearrange(
+        val targetSentence: String,
+        val scrambledWords: List<String>,
+        val wordSigns: Map<String, SignItem> // For visual aid
+    ) : LessonStep()
+
+    @Serializable
+    data class TimedChallenge(
+        val signs: List<SignItem>,
+        val timeLimitSeconds: Int = 30
     ) : LessonStep()
 }
 

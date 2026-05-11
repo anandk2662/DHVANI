@@ -38,7 +38,9 @@ fun ProfileScreen(
 ) {
     val profile by viewModel.profile.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val aiModelUrl by viewModel.aiModelUrl.collectAsState()
     var showEditDialog by remember { mutableStateOf(false) }
+    var showAiUrlDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         bottomBar = {
@@ -83,6 +85,9 @@ fun ProfileScreen(
                             }
                             SettingsItem(Icons.Default.Notifications, "Notifications") {}
                             SettingsItem(Icons.Default.Security, "Privacy & Security") {}
+                            SettingsItem(Icons.Default.Settings, "AI Preference") {
+                                showAiUrlDialog = true
+                            }
                             SettingsItem(Icons.AutoMirrored.Filled.Help, "Help Center") {}
                             
                             Spacer(modifier = Modifier.height(24.dp))
@@ -116,6 +121,54 @@ fun ProfileScreen(
             }
         )
     }
+
+    if (showAiUrlDialog) {
+        AiUrlDialog(
+            currentUrl = aiModelUrl,
+            onDismiss = { showAiUrlDialog = false },
+            onSave = { url ->
+                viewModel.updateAiUrl(url)
+                showAiUrlDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun AiUrlDialog(
+    currentUrl: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var url by remember { mutableStateOf(currentUrl) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("AI Model Configuration") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter the endpoint URL for hand sign recognition API.", style = MaterialTheme.typography.bodySmall)
+                TextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("API URL") },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("https://...") }
+                )
+                Text("The app will POST to this URL with /sign appended if needed.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(url) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

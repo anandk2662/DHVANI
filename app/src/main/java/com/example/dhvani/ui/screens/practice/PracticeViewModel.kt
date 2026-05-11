@@ -81,11 +81,15 @@ class PracticeViewModel @Inject constructor(
         }
     }
 
-    override fun onResults(result: HandLandmarkerResult, imageHeight: Int, imageWidth: Int) {
+    private val _rotationDegrees = MutableStateFlow(0)
+    val rotationDegrees = _rotationDegrees.asStateFlow()
+
+    override fun onResults(result: HandLandmarkerResult, imageHeight: Int, imageWidth: Int, rotationDegrees: Int) {
         viewModelScope.launch {
             _latestResult.value = result
             _imageHeight.value = imageHeight
             _imageWidth.value = imageWidth
+            _rotationDegrees.value = rotationDegrees
             
             val hands = processor.process(result)
             if (hands.isNotEmpty()) {
@@ -93,8 +97,17 @@ class PracticeViewModel @Inject constructor(
                 _prediction.value = "Hand Detected (${topHand.handedness})"
                 _accuracy.value = topHand.score
                 
-                // Send the preprocessed 63-dimension vector to the AI model
-                inferenceManager.predictGesture(topHand.flattenedVector)
+                // Identify left and right hands for the structured AI request
+                val leftHand = hands.find { it.handedness.contains("Left", ignoreCase = true) }?.landmarks
+                val rightHand = hands.find { it.handedness.contains("Right", ignoreCase = true) }?.landmarks
+
+                // Use the current lesson's category if available
+                // For now, assuming alphabet based on previous context or screen state
+                inferenceManager.predictSign(
+                    isAlphabet = true, 
+                    leftHand = leftHand,
+                    rightHand = rightHand
+                )
             } else {
                 _prediction.value = "Waiting for hand..."
                 _accuracy.value = 0f

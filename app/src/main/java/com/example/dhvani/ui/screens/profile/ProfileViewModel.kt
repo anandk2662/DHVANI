@@ -11,10 +11,19 @@ import javax.inject.Inject
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val preferences: com.example.dhvani.data.prefs.AppPreferences
 ) : ViewModel() {
 
     val profile: StateFlow<UserProfile?> = authRepository.currentUserProfile
+
+    private val _aiModelUrl = kotlinx.coroutines.flow.MutableStateFlow(preferences.aiModelUrl)
+    val aiModelUrl = _aiModelUrl.asStateFlow()
+
+    fun updateAiUrl(url: String) {
+        preferences.aiModelUrl = url
+        _aiModelUrl.value = url
+    }
 
     private val _isLoading = kotlinx.coroutines.flow.MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()

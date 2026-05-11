@@ -5,6 +5,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import io.github.jan.supabase.auth.SessionManager
 import io.github.jan.supabase.auth.user.UserSession
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 

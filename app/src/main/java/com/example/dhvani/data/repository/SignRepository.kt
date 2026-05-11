@@ -62,13 +62,32 @@ class SignRepository @Inject constructor(
             // Step 3: Match activity
             steps.add(LessonStep.Match(signs.map { MatchPair(it, it.label) }))
             
-            // Step 4: Camera Practice for each sign
+            // Step 4: Fill in the Blank (if we have at least 2 signs)
+            if (signs.size >= 2) {
+                steps.add(LessonStep.FillBlank(
+                    sentence = "The first letter of the alphabet is [BLANK]",
+                    answerSign = signs[0],
+                    options = signs.shuffled()
+                ))
+            }
+
+            // Step 5: Rearrange
+            steps.add(LessonStep.Rearrange(
+                targetSentence = signs.joinToString("") { it.label },
+                scrambledWords = signs.map { it.label }.shuffled(),
+                wordSigns = signs.associateBy { it.label }
+            ))
+            
+            // Step 6: Camera Practice for each sign
             signs.forEach { steps.add(LessonStep.Camera(it)) }
+
+            // Step 7: Timed Challenge
+            steps.add(LessonStep.TimedChallenge(signs.shuffled(), timeLimitSeconds = 20))
 
             lessonList.add(
                 Lesson(
                     id = "lesson_alpha_$index",
-                    title = "Alphabet Lesson ${index + 1}",
+                    title = "Alpha ${signs.first().label}-${signs.last().label}",
                     signs = signs,
                     steps = steps,
                     category = SignCategory.ALPHABET,
@@ -79,7 +98,7 @@ class SignRepository @Inject constructor(
             )
         }
 
-        // Numbers Lessons (4 per lesson)
+        // Numbers Lessons
         numbers.chunked(4).forEachIndexed { index, signs ->
             val order = alphabets.size / 4 + index
             val steps = mutableListOf<LessonStep>()
@@ -90,11 +109,12 @@ class SignRepository @Inject constructor(
                 steps.add(LessonStep.Quiz(sign, options.shuffled()))
             }
             steps.add(LessonStep.Match(signs.map { MatchPair(it, it.label) }))
+            steps.add(LessonStep.TimedChallenge(signs.shuffled(), timeLimitSeconds = 15))
 
             lessonList.add(
                 Lesson(
                     id = "lesson_num_$index",
-                    title = "Number Lesson ${index + 1}",
+                    title = "Numbers ${signs.first().label}-${signs.last().label}",
                     signs = signs,
                     steps = steps,
                     category = SignCategory.NUMBER,
@@ -132,9 +152,7 @@ class SignRepository @Inject constructor(
     }
 
     fun getAlphabets(): List<SignItem> = alphabets
-
     fun getNumbers(): List<SignItem> = numbers
-
     fun getAllSigns(): List<SignItem> = alphabets + numbers
 
     fun getRandomQuiz(count: Int = 10): List<QuizQuestion> {

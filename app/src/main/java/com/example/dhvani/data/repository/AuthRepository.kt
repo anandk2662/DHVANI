@@ -119,7 +119,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun signInWithGoogle() {
-        supabaseClient.auth.signInWith(Google)
+        supabaseClient.auth.signInWith(Google, redirectUrl = "com.example.dhvani://login-callback")
     }
 
     suspend fun signOut() {

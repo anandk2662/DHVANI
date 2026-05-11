@@ -7,6 +7,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -26,7 +27,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,6 +56,7 @@ fun PracticeScreen(
     val latestResult by viewModel.latestResult.collectAsState()
     val imageHeight by viewModel.imageHeight.collectAsState()
     val imageWidth by viewModel.imageWidth.collectAsState()
+    val rotationDegrees by viewModel.rotationDegrees.collectAsState()
 
     var hasCameraPermission by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -111,6 +112,7 @@ fun PracticeScreen(
                     latestResult = latestResult,
                     imageHeight = imageHeight,
                     imageWidth = imageWidth,
+                    rotationDegrees = rotationDegrees,
                     cameraSelector = cameraSelector,
                     onFlipCamera = { viewModel.toggleCamera() },
                     onBackClick = { viewModel.clearSelection() },
@@ -137,14 +139,14 @@ fun SignSelectionList(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
             Text(
-                "Practice Signs",
+                "AI Practice Lab",
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.ExtraBold
             )
         }
         
         Text(
-            "Select a sign you've encountered to practice with AI",
+            "Select a sign and use your camera to practice in real-time.",
             style = MaterialTheme.typography.bodyMedium,
             color = Color.Gray,
             modifier = Modifier.padding(vertical = 16.dp)
@@ -162,16 +164,18 @@ fun SignSelectionList(
                         modifier = Modifier.padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .background(Color.LightGray.copy(alpha = 0.1f), CircleShape),
-                            contentAlignment = Alignment.Center
+                        Surface(
+                            modifier = Modifier.size(72.dp),
+                            shape = CircleShape,
+                            color = PrimaryGreen.copy(alpha = 0.1f)
                         ) {
-                            Text(sign.icon, fontSize = 32.sp)
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(sign.icon, fontSize = 32.sp)
+                            }
                         }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(sign.label, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(sign.label, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text("${(sign.accuracy * 100).toInt()}% Mastery", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -186,6 +190,7 @@ fun CameraPracticeView(
     latestResult: com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult?,
     imageHeight: Int,
     imageWidth: Int,
+    rotationDegrees: Int,
     cameraSelector: CameraSelector,
     onFlipCamera: () -> Unit,
     onBackClick: () -> Unit,
@@ -237,7 +242,7 @@ fun CameraPracticeView(
     LaunchedEffect(latestResult) {
         latestResult?.let {
             val isFront = cameraSelector == CameraSelector.DEFAULT_FRONT_CAMERA
-            overlayView.setResults(it, imageHeight, imageWidth, isFront)
+            overlayView.setResults(it, imageHeight, imageWidth, rotationDegrees, isFront)
         }
     }
 
@@ -252,50 +257,65 @@ fun CameraPracticeView(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Real-time Hand Position Display
-        latestResult?.landmarks()?.getOrNull(0)?.let { landmarks ->
-            val wrist = landmarks[0]
-            val indexFinger = landmarks[8]
-            
+        // Futuristic HUD Overlay
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Target Preview Card (Glassmorphic)
             Surface(
-                modifier = Modifier.padding(top = 80.dp, start = 24.dp),
-                color = Color.Black.copy(alpha = 0.7f),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 100.dp),
+                color = Color.Black.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(24.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("LIVE TRACKING", color = PrimaryGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Wrist: [X: ${"%.2f".format(wrist.x())}, Y: ${"%.2f".format(wrist.y())}]",
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        text = "Index: [X: ${"%.2f".format(indexFinger.x())}, Y: ${"%.2f".format(indexFinger.y())}]",
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        text = "Frame: ${imageWidth}x${imageHeight}",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(sign.icon, fontSize = 24.sp)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Target: ${sign.label}", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
-        }
-        
-        // ... rest of the UI
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.4f), Color.Transparent, Color.Black.copy(alpha = 0.6f))
-                    )
+            // Accuracy Ring around the screen (Visual Feedback)
+            val accuracy = predictionResult?.confidence ?: 0f
+            val accuracyColor by animateColorAsState(
+                if (accuracy > 0.8f) SuccessGreen else if (accuracy > 0.4f) Color.Yellow else Color.Red,
+                label = "AccuracyColor"
+            )
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(4.dp, accuracyColor.copy(alpha = 0.3f))
+            )
+
+            // Result Feedback
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(24.dp)
+                    .fillMaxWidth()
+            ) {
+                val isCorrect = accuracy > 0.7f
+                AnimatedResultCard(
+                    prediction = predictionResult?.prediction ?: "Detecting...",
+                    accuracy = accuracy,
+                    isCorrect = isCorrect
                 )
-        )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                GradientButton(
+                    text = "CHANGE SIGN",
+                    onClick = onBackClick,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
 
+        // Top Controls
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -305,53 +325,17 @@ fun CameraPracticeView(
         ) {
             IconButton(
                 onClick = onBackClick,
-                modifier = Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape)
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape)
             ) {
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
             }
             
-            Surface(
-                color = Color.White.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(sign.icon, fontSize = 16.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Target: ${sign.label}", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            }
-
             IconButton(
                 onClick = onFlipCamera,
-                modifier = Modifier.background(Color.White.copy(alpha = 0.2f), CircleShape)
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape)
             ) {
                 Icon(Icons.Default.FlipCameraAndroid, contentDescription = "Flip Camera", tint = Color.White)
             }
-        }
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(24.dp)
-                .fillMaxWidth()
-        ) {
-            val isCorrect = (predictionResult?.confidence ?: 0f) > 0.7f
-            AnimatedResultCard(
-                prediction = predictionResult?.prediction ?: "Detecting...",
-                accuracy = predictionResult?.confidence ?: 0f,
-                isCorrect = isCorrect
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            GradientButton(
-                text = "CHANGE SIGN",
-                onClick = onBackClick,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
@@ -359,7 +343,7 @@ fun CameraPracticeView(
 @Composable
 fun AnimatedResultCard(prediction: String, accuracy: Float, isCorrect: Boolean) {
     val backgroundColor by animateColorAsState(
-        if (isCorrect) SuccessGreen.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.9f),
+        if (isCorrect) SuccessGreen.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.7f),
         label = "ResultColor"
     )
     
@@ -369,41 +353,41 @@ fun AnimatedResultCard(prediction: String, accuracy: Float, isCorrect: Boolean) 
         modifier = Modifier
             .fillMaxWidth()
             .scale(scale),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(32.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = if (isCorrect) "EXCELLENT!" else "DETECTING...",
+                text = if (isCorrect) "PERFECT!" else if (accuracy > 0.4f) "ALMOST THERE..." else "KEEP TRYING",
                 style = MaterialTheme.typography.labelLarge,
-                color = if (isCorrect) Color.White else Color.Gray,
-                fontWeight = FontWeight.Bold
+                color = if (isCorrect) Color.White else Color.White.copy(alpha = 0.6f),
+                fontWeight = FontWeight.ExtraBold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = prediction,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = if (isCorrect) Color.White else Color.Black
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White
             )
             
             if (accuracy > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
                 LinearProgressIndicator(
                     progress = { accuracy },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp)
-                        .height(8.dp)
+                        .height(12.dp)
                         .clip(CircleShape),
-                    color = if (isCorrect) Color.White else SuccessGreen,
-                    trackColor = (if (isCorrect) Color.White else SuccessGreen).copy(alpha = 0.2f)
+                    color = Color.White,
+                    trackColor = Color.White.copy(alpha = 0.2f)
                 )
                 Text(
-                    "Accuracy: ${(accuracy * 100).toInt()}%",
-                    color = if (isCorrect) Color.White else Color.Gray,
+                    "Confidence: ${(accuracy * 100).toInt()}%",
+                    color = Color.White.copy(alpha = 0.8f),
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier.padding(top = 8.dp)
                 )
             }
         }
