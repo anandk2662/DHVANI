@@ -3,7 +3,6 @@ package com.example.dhvani.ui.screens.lesson
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -30,6 +29,7 @@ import com.example.dhvani.ui.components.QuizOptionCard
 import com.example.dhvani.ui.components.SignCard
 import com.example.dhvani.ui.theme.PrimaryGreen
 import com.example.dhvani.ui.theme.SuccessGreen
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +41,7 @@ fun LessonScreen(
     val lesson by viewModel.lesson.collectAsState()
     val currentStepIndex by viewModel.currentStepIndex.collectAsState()
     val isCompleted by viewModel.isCompleted.collectAsState()
+    val canGoNext by viewModel.canGoNext.collectAsState()
 
     LaunchedEffect(lessonId) {
         viewModel.loadLesson(lessonId)
@@ -104,12 +105,12 @@ fun LessonScreen(
                         ) { step ->
                             when (step) {
                                 is LessonStep.Learn -> LearnStepView(step.sign)
-                                is LessonStep.Quiz -> QuizStepView(step)
-                                is LessonStep.Match -> MatchStepView(step)
-                                is LessonStep.Camera -> CameraStepView(step)
-                                is LessonStep.FillBlank -> FillBlankStepView(step)
-                                is LessonStep.Rearrange -> RearrangeStepView(step)
-                                is LessonStep.TimedChallenge -> TimedChallengeStepView(step)
+                                is LessonStep.Quiz -> QuizStepView(step, onComplete = { viewModel.setStepCompleted(it) })
+                                is LessonStep.Match -> MatchStepView(step, onComplete = { viewModel.setStepCompleted(it) })
+                                is LessonStep.Camera -> CameraStepView(step, onComplete = { viewModel.setStepCompleted(it) })
+                                is LessonStep.FillBlank -> FillBlankStepView(step, onComplete = { viewModel.setStepCompleted(it) })
+                                is LessonStep.Rearrange -> RearrangeStepView(step, onComplete = { viewModel.setStepCompleted(it) })
+                                is LessonStep.TimedChallenge -> TimedChallengeStepView(step, onComplete = { viewModel.setStepCompleted(it) })
                             }
                         }
                     }
@@ -119,7 +120,8 @@ fun LessonScreen(
                     GradientButton(
                         text = if (currentStepIndex < steps.size - 1) "CONTINUE" else "FINISH",
                         onClick = { viewModel.nextStep() },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = canGoNext
                     )
                 }
             }
@@ -138,7 +140,7 @@ fun LearnStepView(sign: SignItem) {
 }
 
 @Composable
-fun QuizStepView(step: LessonStep.Quiz) {
+fun QuizStepView(step: LessonStep.Quiz, onComplete: (Boolean) -> Unit) {
     var selectedAnswer by remember { mutableStateOf<SignItem?>(null) }
     
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -152,7 +154,10 @@ fun QuizStepView(step: LessonStep.Quiz) {
                 QuizOptionCard(
                     sign = option,
                     isSelected = selectedAnswer == option,
-                    onClick = { selectedAnswer = option }
+                    onClick = { 
+                        selectedAnswer = option
+                        onComplete(true)
+                    }
                 )
             }
         }
@@ -160,9 +165,15 @@ fun QuizStepView(step: LessonStep.Quiz) {
 }
 
 @Composable
-fun MatchStepView(step: LessonStep.Match) {
+fun MatchStepView(step: LessonStep.Match, onComplete: (Boolean) -> Unit) {
     var selectedLeft by remember { mutableStateOf<MatchPair?>(null) }
     var matches by remember { mutableStateOf(setOf<Pair<MatchPair, MatchPair>>()) }
+
+    LaunchedEffect(matches) {
+        if (matches.size == step.pairs.size) {
+            onComplete(true)
+        }
+    }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Match the pairs", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -233,7 +244,7 @@ fun MatchCard(text: String, isSelected: Boolean, isMatched: Boolean, onClick: ()
 }
 
 @Composable
-fun FillBlankStepView(step: LessonStep.FillBlank) {
+fun FillBlankStepView(step: LessonStep.FillBlank, onComplete: (Boolean) -> Unit) {
     var selectedOption by remember { mutableStateOf<SignItem?>(null) }
     
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -261,7 +272,10 @@ fun FillBlankStepView(step: LessonStep.FillBlank) {
                 QuizOptionCard(
                     sign = option,
                     isSelected = selectedOption == option,
-                    onClick = { selectedOption = option },
+                    onClick = { 
+                        selectedOption = option
+                        onComplete(true)
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -271,9 +285,17 @@ fun FillBlankStepView(step: LessonStep.FillBlank) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun RearrangeStepView(step: LessonStep.Rearrange) {
+fun RearrangeStepView(step: LessonStep.Rearrange, onComplete: (Boolean) -> Unit) {
     var orderedWords by remember { mutableStateOf(listOf<String>()) }
     val remainingWords = step.scrambledWords.filter { !orderedWords.contains(it) }
+
+    LaunchedEffect(orderedWords) {
+        if (orderedWords.size == step.scrambledWords.size) {
+            onComplete(true)
+        } else {
+            onComplete(false)
+        }
+    }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("Rearrange to match", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -329,7 +351,13 @@ fun WordChip(word: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun CameraStepView(step: LessonStep.Camera) {
+fun CameraStepView(step: LessonStep.Camera, onComplete: (Boolean) -> Unit) {
+    // Simulate AI detection
+    LaunchedEffect(Unit) {
+        delay(3000)
+        onComplete(true)
+    }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("AI Practice: Show the sign", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
@@ -342,8 +370,6 @@ fun CameraStepView(step: LessonStep.Camera) {
                 .background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
-            // Camera Implementation handled via PracticeScreen logic, 
-            // but for integrated lessons, we show a preview card.
             SignCard(sign = step.targetSign, modifier = Modifier.size(200.dp))
             
             // Hud Overlay Sim
@@ -360,14 +386,15 @@ fun CameraStepView(step: LessonStep.Camera) {
 }
 
 @Composable
-fun TimedChallengeStepView(step: LessonStep.TimedChallenge) {
-    var timeLeft by remember { mutableStateOf(step.timeLimitSeconds) }
+fun TimedChallengeStepView(step: LessonStep.TimedChallenge, onComplete: (Boolean) -> Unit) {
+    var timeLeft by remember { mutableIntStateOf(step.timeLimitSeconds) }
     
     LaunchedEffect(Unit) {
         while (timeLeft > 0) {
-            kotlinx.coroutines.delay(1000)
+            delay(1000)
             timeLeft--
         }
+        onComplete(true)
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {

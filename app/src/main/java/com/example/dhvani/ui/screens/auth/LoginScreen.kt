@@ -13,13 +13,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.dhvani.ui.components.GradientButton
 import com.example.dhvani.ui.components.PremiumTextField
 import com.example.dhvani.ui.theme.WelcomeGradient
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
@@ -32,16 +38,14 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
     val authState by viewModel.authState.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     
     LaunchedEffect(Unit) { visible = true }
 
     LaunchedEffect(authState) {
         if (authState is AuthState.Success) {
             onLoginSuccess()
-            viewModel.resetState()
-        }
-        if (authState is AuthState.ExternalAuthTriggered) {
-            // Reset to Idle so that the user doesn't get "Loading" spinner forever if they cancel
             viewModel.resetState()
         }
     }
@@ -151,12 +155,58 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     OutlinedButton(
-                        onClick = { viewModel.signInWithGoogle() },
+                        onClick = { 
+                            val googleIdOption = GetGoogleIdOption.Builder()
+                                .setFilterByAuthorizedAccounts(false)
+                                .setServerClientId("876950550227-3ddpl8uaoj4mm5evidv5ina6uk5gmhrf.apps.googleusercontent.com")
+                                .build()
+
+                            val request = GetCredentialRequest.Builder()
+                                .addCredentialOption(googleIdOption)
+                                .build()
+
+                            val credentialManager = CredentialManager.create(context)
+                            
+                            scope.launch {
+                                try {
+                                    val result = credentialManager.getCredential(
+                                        request = request,
+                                        context = context
+                                    )
+                                    val credential = result.credential
+                                    
+                                    // Handle the credential type properly
+                                    try {
+                                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+                                        viewModel.signInWithCredentialManager(googleIdTokenCredential.idToken)
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("Login", "Failed to parse Google ID Token: ${e.message}")
+                                        viewModel.setError("Sign-in failed: Could not process Google account data.")
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("Login", "Credential Manager failed: ${e.message}")
+                                    val errorMessage = when {
+                                        e.message?.contains("No credentials available") == true -> 
+                                            "No Google accounts found for this app. Check if SHA-1 and Client ID match in Google Console."
+                                        else -> e.message ?: "Google Sign-In failed"
+                                    }
+                                    viewModel.setError(errorMessage)
+                                }
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         enabled = authState !is AuthState.Loading
                     ) {
                         Text("Sign in with Google")
+                    }
+
+                    if (authState is AuthState.Error && (authState as AuthState.Error).message.contains("Check if SHA-1")) {
+                        TextButton(
+                            onClick = { viewModel.signInWithGoogleNative() }
+                        ) {
+                            Text("Try Browser-based Sign-in instead", style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }

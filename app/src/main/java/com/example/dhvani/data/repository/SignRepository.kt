@@ -9,33 +9,69 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 import com.example.dhvani.data.model.*
+import com.example.dhvani.data.prefs.AppPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+import com.example.dhvani.data.SignData
+import java.util.Locale
+
 @Singleton
 class SignRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val preferences: AppPreferences
 ) {
 
     private val _lessons = MutableStateFlow<List<Lesson>>(emptyList())
     val lessons = _lessons.asStateFlow()
 
-    private val alphabets = ('A'..'Z').map { char ->
-        SignItem(
-            id = "alpha_$char",
-            label = char.toString(),
-            assetPath = "starter_signs/a-z/${char.lowercase()}.jpg",
-            category = SignCategory.ALPHABET
-        )
-    }
+    private val _allSigns: List<SignItem> by lazy {
+        val signs = mutableListOf<SignItem>()
+        
+        // Get list of all video files in assets/dataset to match correctly
+        val datasetFiles = try {
+            context.assets.list("dataset")?.toList() ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
 
-    private val numbers = (0..9).map { num ->
-        SignItem(
-            id = "num_$num",
-            label = num.toString(),
-            assetPath = "starter_signs/1-10/$num.jpg",
-            category = SignCategory.NUMBER
-        )
+        // Add Alphabets
+        SignData.signsByAlphabets.forEach { alpha ->
+            signs.add(SignItem(
+                id = "alpha_$alpha",
+                label = alpha,
+                assetPath = "starter_signs/a-z/${alpha.lowercase()}.jpg",
+                category = SignCategory.ALPHABET
+            ))
+        }
+
+        // Add Categories
+        SignData.categoryMapping.forEach { (category: SignCategory, words: List<String>) ->
+            words.forEach { word ->
+                val fileName = word.lowercase(Locale.ROOT).replace(" ", "_").replace("/", "_")
+                
+                val path = if (category == SignCategory.NUMBER) {
+                    "starter_signs/1-10/$word.jpg"
+                } else {
+                    // Match the word with files in dataset (case insensitive check but using actual filename)
+                    val matchedFile = datasetFiles.find { 
+                        it.equals("$word.mp4", ignoreCase = true) || 
+                        it.startsWith("$word ", ignoreCase = true) ||
+                        it.startsWith("$word[", ignoreCase = true) ||
+                        it.startsWith("$word(", ignoreCase = true)
+                    }
+                    if (matchedFile != null) "dataset/$matchedFile" else "dataset/$word.mp4"
+                }
+
+                signs.add(SignItem(
+                    id = "${category.name.lowercase(Locale.ROOT)}_$fileName",
+                    label = word,
+                    assetPath = path,
+                    category = category
+                ))
+            }
+        }
+        signs
     }
 
     init {
@@ -44,88 +80,96 @@ class SignRepository @Inject constructor(
 
     private fun createLessons() {
         val lessonList = mutableListOf<Lesson>()
-        val allSigns = alphabets + numbers
-        
-        // Alphabets Lessons (4 per lesson)
-        alphabets.chunked(4).forEachIndexed { index, signs ->
-            val steps = mutableListOf<LessonStep>()
-            
-            // Step 1: Learn each sign
-            signs.forEach { steps.add(LessonStep.Learn(it)) }
-            
-            // Step 2: Quiz for each sign
-            signs.forEach { sign ->
-                val options = (allSigns - sign).shuffled().take(3) + sign
-                steps.add(LessonStep.Quiz(sign, options.shuffled()))
-            }
-            
-            // Step 3: Match activity
-            steps.add(LessonStep.Match(signs.map { MatchPair(it, it.label) }))
-            
-            // Step 4: Fill in the Blank (if we have at least 2 signs)
-            if (signs.size >= 2) {
-                steps.add(LessonStep.FillBlank(
-                    sentence = "The first letter of the alphabet is [BLANK]",
-                    answerSign = signs[0],
-                    options = signs.shuffled()
-                ))
-            }
+        val completedIds = preferences.completedLessons
+        var globalOrder = 0
 
-            // Step 5: Rearrange
-            steps.add(LessonStep.Rearrange(
-                targetSentence = signs.joinToString("") { it.label },
-                scrambledWords = signs.map { it.label }.shuffled(),
-                wordSigns = signs.associateBy { it.label }
-            ))
-            
-            // Step 6: Camera Practice for each sign
-            signs.forEach { steps.add(LessonStep.Camera(it)) }
+        // Preferred order of categories for the curriculum
+        val orderedCategories = listOf(
+            SignCategory.ALPHABET,
+            SignCategory.NUMBER,
+            SignCategory.BASICS,
+            SignCategory.FAMILY,
+            SignCategory.EMOTIONS,
+            SignCategory.BODY,
+            SignCategory.COLORS,
+            SignCategory.ANIMALS,
+            SignCategory.HOME,
+            SignCategory.FOOD,
+            SignCategory.TIME,
+            SignCategory.EDUCATION,
+            SignCategory.TRANSPORT,
+            SignCategory.ACTIONS,
+            SignCategory.WORK,
+            SignCategory.TECHNOLOGY,
+            SignCategory.GRAMMAR,
+            SignCategory.SPORTS,
+            SignCategory.RELIGION,
+            SignCategory.MISC
+        )
 
-            // Step 7: Timed Challenge
-            steps.add(LessonStep.TimedChallenge(signs.shuffled(), timeLimitSeconds = 20))
+        orderedCategories.forEach { category ->
+            val signsInCategory = _allSigns.filter { it.category == category }
+            if (signsInCategory.isEmpty()) return@forEach
 
-            lessonList.add(
-                Lesson(
-                    id = "lesson_alpha_$index",
-                    title = "Alpha ${signs.first().label}-${signs.last().label}",
-                    signs = signs,
-                    steps = steps,
-                    category = SignCategory.ALPHABET,
-                    order = index,
-                    isLocked = index > 0,
-                    status = if (index == 0) LessonStatus.AVAILABLE else LessonStatus.LOCKED
+            // Divide category into chunks of 5 for progressive lessons
+            signsInCategory.chunked(5).forEachIndexed { index, signs ->
+                val id = "lesson_${category.name.lowercase(Locale.ROOT)}_$index"
+                val steps = generateStepsForSigns(signs)
+                
+                val isCompleted = completedIds.contains(id)
+                val isPreviousCompleted = if (globalOrder == 0) true 
+                    else completedIds.contains(lessonList.lastOrNull()?.id ?: "")
+
+                val difficulty = when {
+                    category == SignCategory.ALPHABET || category == SignCategory.NUMBER || category == SignCategory.BASICS -> "Beginner"
+                    category == SignCategory.FAMILY || category == SignCategory.EMOTIONS || category == SignCategory.BODY || category == SignCategory.COLORS -> "Beginner"
+                    category == SignCategory.ANIMALS || category == SignCategory.HOME || category == SignCategory.FOOD || category == SignCategory.TIME -> "Intermediate"
+                    else -> "Advanced"
+                }
+
+                lessonList.add(
+                    Lesson(
+                        id = id,
+                        title = "${category.name.lowercase(Locale.ROOT).replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }} - $difficulty Part ${index + 1}",
+                        signs = signs,
+                        steps = steps,
+                        category = category,
+                        order = globalOrder++,
+                        isLocked = !isPreviousCompleted,
+                        status = when {
+                            isCompleted -> LessonStatus.COMPLETED
+                            isPreviousCompleted -> LessonStatus.AVAILABLE
+                            else -> LessonStatus.LOCKED
+                        }
+                    )
                 )
-            )
-        }
-
-        // Numbers Lessons
-        numbers.chunked(4).forEachIndexed { index, signs ->
-            val order = alphabets.size / 4 + index
-            val steps = mutableListOf<LessonStep>()
-            
-            signs.forEach { steps.add(LessonStep.Learn(it)) }
-            signs.forEach { sign ->
-                val options = (allSigns - sign).shuffled().take(3) + sign
-                steps.add(LessonStep.Quiz(sign, options.shuffled()))
             }
-            steps.add(LessonStep.Match(signs.map { MatchPair(it, it.label) }))
-            steps.add(LessonStep.TimedChallenge(signs.shuffled(), timeLimitSeconds = 15))
-
-            lessonList.add(
-                Lesson(
-                    id = "lesson_num_$index",
-                    title = "Numbers ${signs.first().label}-${signs.last().label}",
-                    signs = signs,
-                    steps = steps,
-                    category = SignCategory.NUMBER,
-                    order = order,
-                    isLocked = true,
-                    status = LessonStatus.LOCKED
-                )
-            )
         }
         
         _lessons.value = lessonList
+    }
+
+    private fun generateStepsForSigns(signs: List<SignItem>): List<LessonStep> {
+        val steps = mutableListOf<LessonStep>()
+        
+        // 1. Learning Phase
+        signs.forEach { steps.add(LessonStep.Learn(it)) }
+        
+        // 2. Quiz Phase
+        signs.forEach { sign ->
+            val options = (_allSigns - sign).shuffled().take(3) + sign
+            steps.add(LessonStep.Quiz(sign, options.shuffled()))
+        }
+        
+        // 3. Matching Phase
+        if (signs.size >= 3) {
+            steps.add(LessonStep.Match(signs.take(4).map { MatchPair(it, it.label) }))
+        }
+        
+        // 4. Camera Practice (AI)
+        signs.take(2).forEach { steps.add(LessonStep.Camera(it)) }
+
+        return steps
     }
 
     fun getLessonById(lessonId: String): Lesson? {
@@ -133,35 +177,27 @@ class SignRepository @Inject constructor(
     }
 
     suspend fun completeLesson(lessonId: String) {
-        val currentLessons = _lessons.value.toMutableList()
-        val index = currentLessons.indexOfFirst { it.id == lessonId }
-        if (index != -1) {
-            val completedLesson = currentLessons[index].copy(status = LessonStatus.COMPLETED)
-            currentLessons[index] = completedLesson
-            
-            // Unlock next lesson
-            if (index + 1 < currentLessons.size) {
-                val nextLesson = currentLessons[index + 1].copy(
-                    isLocked = false,
-                    status = LessonStatus.AVAILABLE
-                )
-                currentLessons[index + 1] = nextLesson
-            }
-            _lessons.value = currentLessons
-        }
+        val completed = preferences.completedLessons.toMutableSet()
+        completed.add(lessonId)
+        preferences.completedLessons = completed
+        createLessons()
     }
 
-    fun getAlphabets(): List<SignItem> = alphabets
-    fun getNumbers(): List<SignItem> = numbers
-    fun getAllSigns(): List<SignItem> = alphabets + numbers
+    fun getAllSigns(): List<SignItem> = _allSigns
+
+    fun getSignsByCategory(category: SignCategory): List<SignItem> {
+        return _allSigns.filter { it.category == category }
+    }
+
+    fun searchSigns(query: String): List<SignItem> {
+        return _allSigns.filter { it.label.contains(query, ignoreCase = true) }
+    }
 
     fun getRandomQuiz(count: Int = 10): List<QuizQuestion> {
-        val allSigns = getAllSigns()
-        if (allSigns.isEmpty()) return emptyList()
-
+        if (_allSigns.isEmpty()) return emptyList()
         return List(count) {
-            val correctAnswer = allSigns.random()
-            val options = (allSigns - correctAnswer).shuffled().take(3) + correctAnswer
+            val correctAnswer = _allSigns.random()
+            val options = (_allSigns - correctAnswer).shuffled().take(3) + correctAnswer
             QuizQuestion(correctAnswer, options.shuffled())
         }
     }

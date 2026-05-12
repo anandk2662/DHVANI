@@ -26,18 +26,39 @@ class LessonViewModel @Inject constructor(
     private val _isCompleted = MutableStateFlow(false)
     val isCompleted = _isCompleted.asStateFlow()
 
+    private val _canGoNext = MutableStateFlow(false)
+    val canGoNext = _canGoNext.asStateFlow()
+
     fun loadLesson(lessonId: String) {
         val result = signRepository.getLessonById(lessonId)
         _lesson.value = result
         _currentStepIndex.value = 0
+        updateCanGoNext()
+    }
+
+    fun setStepCompleted(completed: Boolean) {
+        _canGoNext.value = completed
     }
 
     fun nextStep() {
         val currentLesson = _lesson.value ?: return
         if (_currentStepIndex.value < currentLesson.steps.size - 1) {
             _currentStepIndex.value++
+            updateCanGoNext()
         } else {
             completeLesson()
+        }
+    }
+
+    private fun updateCanGoNext() {
+        val lesson = _lesson.value ?: return
+        val step = lesson.steps.getOrNull(_currentStepIndex.value)
+        
+        // Some steps are auto-completed (like Learn)
+        // Others require interaction (Quiz, Match, etc.)
+        _canGoNext.value = when (step) {
+            is LessonStep.Learn -> true
+            else -> false // Requires explicit setStepCompleted(true)
         }
     }
 

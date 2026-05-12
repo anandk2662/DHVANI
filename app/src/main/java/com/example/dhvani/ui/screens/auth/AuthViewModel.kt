@@ -82,15 +82,24 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun signInWithGoogle() {
+    fun signInWithCredentialManager(idToken: String) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            try {
+                repository.signInWithIdToken(idToken)
+                _authState.value = AuthState.Success
+            } catch (e: Exception) {
+                _authState.value = AuthState.Error(mapError(e))
+            }
+        }
+    }
+
+    fun signInWithGoogleNative() {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
                 repository.signInWithGoogle()
-                // Do NOT set Success here, as the user might not have logged in yet.
-                // The redirection is handled by the intent-filter in Manifest and handleDeeplinks in MainActivity.
-                // We set a specific state to indicate that a browser/external app is expected.
-                _authState.value = AuthState.ExternalAuthTriggered
+                // The browser will handle the rest; Success is handled by session listeners
             } catch (e: Exception) {
                 _authState.value = AuthState.Error(mapError(e))
             }
@@ -117,6 +126,10 @@ class AuthViewModel @Inject constructor(
     
     fun resetState() {
         _authState.value = AuthState.Idle
+    }
+
+    fun setError(message: String) {
+        _authState.value = AuthState.Error(message)
     }
 }
 

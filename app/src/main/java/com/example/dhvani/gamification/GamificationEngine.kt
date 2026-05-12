@@ -1,6 +1,10 @@
 package com.example.dhvani.gamification
 
 import com.example.dhvani.data.repository.AuthRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -11,12 +15,25 @@ import javax.inject.Singleton
 class GamificationEngine @Inject constructor(
     private val authRepository: AuthRepository
 ) {
+    private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
     companion object {
         const val XP_PER_CORRECT_ANSWER = 10
         const val XP_PERFECT_QUIZ_BONUS = 50
         const val XP_STREAK_BONUS = 25
         const val XP_LESSON_COMPLETION = 100
         private val DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE
+    }
+
+    init {
+        // Observe profile changes to check streak when user logs in
+        engineScope.launch {
+            authRepository.currentUserProfile.collect { profile ->
+                if (profile != null) {
+                    checkAndResetBrokenStreak()
+                }
+            }
+        }
     }
 
     suspend fun onCorrectAnswer() {
@@ -71,7 +88,7 @@ class GamificationEngine @Inject constructor(
         }
     }
 
-    // Called on app launch to check if streak was broken yesterday
+    // Called on app launch or login to check if streak was broken yesterday
     suspend fun checkAndResetBrokenStreak() {
         val profile = authRepository.currentUserProfile.value ?: return
         val lastActiveString = profile.last_active_date ?: return
@@ -83,7 +100,7 @@ class GamificationEngine @Inject constructor(
         if (daysBetween > 1L) {
             // Broken streak
             authRepository.updateStreak(0, lastActiveString) // Keep last active, but reset count
-            android.util.Log.d("Streak", "Streak broken at launch")
+            android.util.Log.d("Streak", "Streak broken")
         }
     }
 
