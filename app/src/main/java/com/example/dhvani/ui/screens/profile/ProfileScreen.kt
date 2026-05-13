@@ -2,8 +2,11 @@ package com.example.dhvani.ui.screens.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,9 +38,11 @@ fun ProfileScreen(
     onProfileClick: () -> Unit,
     onLeaderboardClick: () -> Unit,
     onLogoutSuccess: () -> Unit,
+    onUserClick: (String) -> Unit,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val profile by viewModel.profile.collectAsState()
+    val friendProfiles by viewModel.friendProfiles.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val aiModelUrl by viewModel.aiModelUrl.collectAsState()
     var showEditDialog by remember { mutableStateOf(false) }
@@ -74,6 +79,114 @@ fun ProfileScreen(
                         ) {
                             StatCard("XP", profile?.xp_points?.toString() ?: "0", Icons.Default.FlashOn, com.example.dhvani.ui.theme.AccentPurple, Modifier.weight(1f))
                             StatCard("Streak", profile?.current_streak?.toString() ?: "0", Icons.Default.LocalFireDepartment, Color(0xFFFF9800), Modifier.weight(1f))
+                        }
+                    }
+
+                    item {
+                        Column(modifier = Modifier.padding(24.dp)) {
+                            Text("Social", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            val friends = profile?.friend_ids ?: emptyList()
+                            val sharedStreaks = profile?.shared_streaks ?: emptyMap()
+
+                            if (friends.isEmpty() && sharedStreaks.isEmpty()) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(20.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(24.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text("🤝", fontSize = 40.sp)
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text("No shared streaks yet", fontWeight = FontWeight.Bold)
+                                        Text("Practice with friends to grow your streaks together!", 
+                                            style = MaterialTheme.typography.bodySmall, 
+                                            color = Color.Gray,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Button(
+                                            onClick = onLeaderboardClick,
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text("FIND FRIENDS")
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Friends Summary
+                                Text("Friends (${friendProfiles.size})", style = MaterialTheme.typography.titleMedium, color = Color.Gray)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                // Scrollable friends list
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(friendProfiles) { friend ->
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            modifier = Modifier.clickable { onUserClick(friend.id) }
+                                        ) {
+                                            Surface(
+                                                modifier = Modifier.size(60.dp),
+                                                shape = CircleShape,
+                                                color = PrimaryGreen.copy(alpha = 0.1f),
+                                                border = androidx.compose.foundation.BorderStroke(2.dp, PrimaryGreen)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Text(friend.username?.take(1)?.uppercase() ?: "?", fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                            Text(friend.username ?: "User", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                if (sharedStreaks.isNotEmpty()) {
+                                    Text("Shared Streaks", style = MaterialTheme.typography.titleMedium, color = Color.Gray)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    sharedStreaks.forEach { (friendId, streak) ->
+                                        val friendName = friendProfiles.find { it.id == friendId }?.username ?: friendId
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { onUserClick(friendId) },
+                                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0).copy(alpha = 0.5f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(16.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.size(40.dp).background(Color.White, CircleShape),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text("🔥", fontSize = 20.sp)
+                                                }
+                                                Spacer(modifier = Modifier.width(16.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text("Shared Streak", fontWeight = FontWeight.Bold)
+                                                    Text("With $friendName", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                                }
+                                                Text("$streak Days", fontWeight = FontWeight.Black, color = Color(0xFFFF9800))
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                TextButton(
+                                    onClick = onLeaderboardClick,
+                                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                                ) {
+                                    Text("Add more friends from Leaderboard")
+                                }
+                            }
                         }
                     }
 

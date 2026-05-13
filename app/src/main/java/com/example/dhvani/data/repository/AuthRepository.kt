@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.serializer
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -147,8 +151,26 @@ class AuthRepository @Inject constructor(
 
     suspend fun getProfile(): UserProfile? {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return null
-        return getProfileById(userId)?.also {
-            _currentUserProfile.value = it
+        val fetched = getProfileById(userId) ?: return null
+        
+        val current = _currentUserProfile.value
+        if (current != null && current.id == fetched.id) {
+            // Merge logic: protect local progress from old or uninitialized DB state
+            val merged = fetched.copy(
+                xp_points = maxOf(fetched.xp_points, current.xp_points),
+                current_streak = maxOf(fetched.current_streak, current.current_streak),
+                login_streak = maxOf(fetched.login_streak, current.login_streak),
+                last_active_date = if (current.last_active_date != null && 
+                    (fetched.last_active_date == null || current.last_active_date > fetched.last_active_date!!))
+                    current.last_active_date else fetched.last_active_date,
+                friend_ids = if (!fetched.friend_ids.isNullOrEmpty()) fetched.friend_ids else current.friend_ids,
+                shared_streaks = if (!fetched.shared_streaks.isNullOrEmpty()) fetched.shared_streaks else current.shared_streaks
+            )
+            _currentUserProfile.value = merged
+            return merged
+        } else {
+            _currentUserProfile.value = fetched
+            return fetched
         }
     }
 
@@ -162,16 +184,35 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    suspend fun getProfilesByIds(userIds: List<String>): List<UserProfile> {
+        if (userIds.isEmpty()) return emptyList()
+        return try {
+            supabaseClient.postgrest["profiles"]
+                .select { 
+                    filter { 
+                        // Using a simple eq loop ifisIn is not resolving, 
+                        // but usually it's isIn for Supabase-kt
+                        or {
+                            userIds.forEach { id -> eq("id", id) }
+                        }
+                    } 
+                }
+                .decodeList<UserProfile>()
+        } catch (e: Exception) {
+            android.util.Log.e("AuthRepository", "Failed to fetch multiple profiles", e)
+            emptyList()
+        }
+    }
+
     suspend fun updateProfile(profile: UserProfile) {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return
         try {
-            supabaseClient.postgrest["profiles"].update(profile) {
-                filter { eq("id", userId) }
-            }
+            // Using upsert for better reliability in syncing profile data
+            supabaseClient.postgrest["profiles"].upsert(profile)
             _currentUserProfile.value = profile
-            android.util.Log.d("AuthRepository", "Profile updated successfully for $userId")
+            android.util.Log.d("AuthRepository", "Profile synced successfully for $userId")
         } catch (e: Exception) {
-            android.util.Log.e("AuthRepository", "Failed to update profile", e)
+            android.util.Log.e("AuthRepository", "Failed to sync profile", e)
             throw e
         }
     }
@@ -186,12 +227,11 @@ class AuthRepository @Inject constructor(
             league_index = newLeague.id
         )
         
-        // Update local state immediately
         _currentUserProfile.value = updatedProfile
         
         try {
-            updateProfile(updatedProfile)
-            android.util.Log.d("AuthRepository", "XP and League updated in DB for ${profile.id}")
+            supabaseClient.postgrest["profiles"].upsert(updatedProfile)
+            android.util.Log.d("AuthRepository", "XP updated in DB for ${profile.id}")
         } catch (e: Exception) {
             android.util.Log.e("AuthRepository", "Failed to update XP in DB: ${e.message}")
         }
@@ -199,20 +239,36 @@ class AuthRepository @Inject constructor(
 
     suspend fun updateStreak(streak: Int, lastActiveDate: String? = null) {
         val profile = _currentUserProfile.value ?: return
+        
+        // login_streak (total active days) increments only if this is the first activity of the day
+        val isFirstActivityEver = profile.last_active_date == null
+        val isNewDay = lastActiveDate != null && lastActiveDate != profile.last_active_date
+        
+        val newLoginStreak = if ((isFirstActivityEver || isNewDay) && streak > 0) {
+            profile.login_streak + 1
+        } else {
+            profile.login_streak
+        }
+        
         val updatedProfile = profile.copy(
             current_streak = streak,
-            last_active_date = lastActiveDate,
-            login_streak = if (streak > profile.login_streak) streak else profile.login_streak
+            last_active_date = lastActiveDate ?: profile.last_active_date,
+            login_streak = newLoginStreak
         )
         
-        // Update local state immediately so UI reflects it even if DB fails
         _currentUserProfile.value = updatedProfile
         
         try {
-            supabaseClient.postgrest["profiles"].update(updatedProfile) {
+            val updateData = buildJsonObject {
+                put("current_streak", streak)
+                if (lastActiveDate != null) put("last_active_date", lastActiveDate)
+                put("login_streak", newLoginStreak)
+            }
+            // Use update for better reliability on existing rows
+            supabaseClient.postgrest["profiles"].update(updateData) {
                 filter { eq("id", profile.id) }
             }
-            android.util.Log.d("AuthRepository", "Streak updated successfully for ${profile.id}")
+            android.util.Log.d("AuthRepository", "Streak updated in DB. Current: $streak, Total Days: $newLoginStreak")
         } catch (e: Exception) {
             android.util.Log.e("AuthRepository", "Failed to update streak in DB: ${e.message}")
         }
@@ -231,6 +287,44 @@ class AuthRepository @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("AuthRepository", "Failed to fetch leaderboard", e)
             emptyList()
+        }
+    }
+
+    // --- Social Features ---
+
+    suspend fun addFriend(friendId: String) {
+        val currentProfile = _currentUserProfile.value ?: return
+        val currentFriends = currentProfile.friend_ids?.toMutableList() ?: mutableListOf()
+        
+        if (!currentFriends.contains(friendId)) {
+            currentFriends.add(friendId)
+            val updatedProfile = currentProfile.copy(friend_ids = currentFriends)
+            _currentUserProfile.value = updatedProfile
+            
+            try {
+                supabaseClient.postgrest["profiles"].upsert(updatedProfile)
+                android.util.Log.d("AuthRepository", "Friend added in DB")
+            } catch (e: Exception) {
+                android.util.Log.e("AuthRepository", "Failed to add friend in DB: ${e.message}")
+            }
+        }
+    }
+
+    suspend fun updateSharedStreak(friendId: String, increment: Boolean = true) {
+        val currentProfile = _currentUserProfile.value ?: return
+        val shared = currentProfile.shared_streaks?.toMutableMap() ?: mutableMapOf()
+        
+        val currentVal = shared[friendId] ?: 0
+        shared[friendId] = if (increment) currentVal + 1 else 0
+        
+        val updatedProfile = currentProfile.copy(shared_streaks = shared)
+        _currentUserProfile.value = updatedProfile
+        
+        try {
+            supabaseClient.postgrest["profiles"].upsert(updatedProfile)
+            android.util.Log.d("AuthRepository", "Shared streak updated in DB")
+        } catch (e: Exception) {
+            android.util.Log.e("AuthRepository", "Failed to update shared streak in DB: ${e.message}")
         }
     }
 }

@@ -200,10 +200,14 @@ class SignRepository @Inject constructor(
             val distractorPool = when (category) {
                 SignCategory.ALPHABET -> _allSigns.filter { it.category == SignCategory.ALPHABET }
                 SignCategory.NUMBER -> _allSigns.filter { it.category == SignCategory.NUMBER }
-                else -> _allSigns.filter { it.category == category }
+                else -> {
+                    // For words, we can pick distractors from ANY word category 
+                    // to ensure variety and enough options
+                    _allSigns.filter { it.category != SignCategory.ALPHABET && it.category != SignCategory.NUMBER }
+                }
             }
 
-            // Ensure distractors don't include the correct answer and are from the same "type"
+            // Ensure distractors don't include the correct answer
             val distractors = (distractorPool - correctAnswer).shuffled()
             
             val optionCount = when (difficulty) {

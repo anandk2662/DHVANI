@@ -164,14 +164,11 @@ fun QuizStepView(step: LessonStep.Quiz, onComplete: (Boolean) -> Unit) {
 
         val fourOptions = remember(step) {
             val correct = step.sign
-            val distractors = step.options
-                .filter {
-                    it != correct &&
-                            (it.category == SignCategory.ALPHABET || it.category == SignCategory.NUMBER)
-                }
-                .shuffled()
-                .take(3)
-            (distractors + correct).shuffled()
+            // Use the options provided in the step, but ensure we have 4 items
+            // previously it was filtering only alphabets/numbers which broke word quizes
+            val options = step.options.toMutableList()
+            if (!options.contains(correct)) options.add(correct)
+            options.distinctBy { it.id }.shuffled().take(4)
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(fourOptions) { option ->

@@ -26,15 +26,17 @@ class GamificationEngine @Inject constructor(
     }
 
     private var lastCheckedProfileId: String? = null
+    private var isStreakCheckedThisSession = false
 
     init {
         // Observe profile changes to check streak when user logs in
         engineScope.launch {
             authRepository.currentUserProfile.collect { profile ->
-                // Only check broken streak once per user ID session to prevent resets on navigation
-                if (profile != null && profile.id != lastCheckedProfileId) {
+                // Only check broken streak once per user login/session to prevent resets on navigation
+                if (profile != null && (profile.id != lastCheckedProfileId || !isStreakCheckedThisSession)) {
                     checkAndResetBrokenStreak()
                     lastCheckedProfileId = profile.id
+                    isStreakCheckedThisSession = true
                 }
             }
         }
@@ -55,6 +57,10 @@ class GamificationEngine @Inject constructor(
         var totalXp = 50 // Base XP for quiz
         if (perfect) totalXp += XP_PERFECT_QUIZ_BONUS
         authRepository.addXp(totalXp)
+        updateStreak()
+    }
+
+    suspend fun refreshStreak() {
         updateStreak()
     }
 

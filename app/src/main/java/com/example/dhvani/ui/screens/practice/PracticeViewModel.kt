@@ -61,7 +61,8 @@ class PracticeViewModel @Inject constructor(
                 val state = _sessionState.value
                 if (state is PracticeSessionState.InProgress && result != null && !_isProcessingCorrect.value) {
                     val targetSign = state.signs[state.currentSignIndex]
-                    if (result.confidence > 0.7f && result.prediction.equals(targetSign.label, ignoreCase = true)) {
+                    // Use isStable flag from InferenceManager which includes confidence and stability checks
+                    if (result.isStable && result.prediction.equals(targetSign.label, ignoreCase = true)) {
                         handleCorrectPrediction(targetSign)
                     }
                 }

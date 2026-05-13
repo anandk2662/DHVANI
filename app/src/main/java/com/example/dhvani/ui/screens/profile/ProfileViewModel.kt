@@ -17,6 +17,9 @@ class ProfileViewModel @Inject constructor(
 
     val profile: StateFlow<UserProfile?> = authRepository.currentUserProfile
 
+    private val _friendProfiles = kotlinx.coroutines.flow.MutableStateFlow<List<UserProfile>>(emptyList())
+    val friendProfiles = _friendProfiles.asStateFlow()
+
     private val _otherProfile = kotlinx.coroutines.flow.MutableStateFlow<UserProfile?>(null)
     val otherProfile = _otherProfile.asStateFlow()
 
@@ -43,7 +46,13 @@ class ProfileViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
             try {
-                authRepository.getProfile()
+                val p = authRepository.getProfile()
+                p?.friend_ids?.let { ids ->
+                    if (ids.isNotEmpty()) {
+                        val friends = authRepository.getProfilesByIds(ids)
+                        _friendProfiles.value = friends
+                    }
+                }
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load profile"
             } finally {
@@ -91,6 +100,34 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.signOut()
             onSuccess()
+        }
+    }
+
+    // --- Social Features ---
+
+    fun addFriend(friendId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                authRepository.addFriend(friendId)
+            } catch (e: Exception) {
+                _error.value = "Failed to add friend: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun syncSharedStreak(friendId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                authRepository.updateSharedStreak(friendId)
+            } catch (e: Exception) {
+                _error.value = "Failed to sync streak: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 }

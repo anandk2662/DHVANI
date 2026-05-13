@@ -82,7 +82,8 @@ class QuizViewModel @Inject constructor(
             _imageWidth.value = imageWidth
             _rotationDegrees.value = rotationDegrees
             
-            inferenceManager.predictRemote(result)
+            // Switch to on-device inference by default for better performance and consistency
+            inferenceManager.predictOnDevice(result)
         }
     }
 
@@ -149,7 +150,12 @@ class QuizViewModel @Inject constructor(
         timerJob?.cancel()
         viewModelScope.launch {
             val isSolved = preferences.completedQuizzes.contains(currentQuizId)
+            
+            // Streak updates for ANY practice
+            gamificationEngine.checkAndResetBrokenStreak() // Final check
+            
             if (!isSolved) {
+                // XP updates only for the FIRST time
                 gamificationEngine.onQuizCompleted(perfect = _score.value == _questions.value.size)
                 
                 // Mark as solved if score is decent (e.g. > 70%)
@@ -160,6 +166,9 @@ class QuizViewModel @Inject constructor(
                         preferences.completedQuizzes = solved
                     }
                 }
+            } else {
+                // Just update streak without awarding XP for solved content
+                gamificationEngine.refreshStreak()
             }
         }
     }

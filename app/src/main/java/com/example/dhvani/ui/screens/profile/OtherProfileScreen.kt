@@ -78,20 +78,26 @@ fun OtherProfileScreen(
 
                     item {
                         Column(modifier = Modifier.padding(24.dp)) {
+                            val isFriend = viewModel.profile.collectAsState().value?.friend_ids?.contains(userId) == true
+                            
                             Button(
-                                onClick = { /* Add Friend */ },
+                                onClick = { if (!isFriend) viewModel.addFriend(userId) },
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+                                enabled = !isFriend,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isFriend) Color.Gray else MaterialTheme.colorScheme.primary
+                                )
                             ) {
-                                Icon(Icons.Default.PersonAdd, contentDescription = null)
+                                Icon(if (isFriend) Icons.Default.Check else Icons.Default.PersonAdd, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("ADD FRIEND")
+                                Text(if (isFriend) "FRIENDS" else "ADD FRIEND")
                             }
                             
                             Spacer(modifier = Modifier.height(16.dp))
                             
                             OutlinedButton(
-                                onClick = { /* Start Shared Streak */ },
+                                onClick = { viewModel.syncSharedStreak(userId) },
                                 modifier = Modifier.fillMaxWidth().height(56.dp),
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
                             ) {
@@ -106,16 +112,21 @@ fun OtherProfileScreen(
                         Column(modifier = Modifier.padding(24.dp)) {
                             Text("Shared Streaks", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(12.dp))
+                            
+                            val sharedStreakCount = viewModel.profile.collectAsState().value?.shared_streaks?.get(userId) ?: 0
+                            
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0).copy(alpha = 0.5f))
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (sharedStreakCount > 0) Color(0xFFFFF3E0).copy(alpha = 0.8f) else Color.LightGray.copy(alpha = 0.1f)
+                                )
                             ) {
                                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("🔥", fontSize = 24.sp)
+                                    Text(if (sharedStreakCount > 0) "🔥" else "🌑", fontSize = 24.sp)
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text("7 Day Duo Streak", fontWeight = FontWeight.Bold)
-                                        Text("Keep practicing to grow it!", style = MaterialTheme.typography.bodySmall)
+                                        Text(if (sharedStreakCount > 0) "$sharedStreakCount Day Duo Streak" else "No shared streak yet", fontWeight = FontWeight.Bold)
+                                        Text(if (sharedStreakCount > 0) "Keep practicing to grow it!" else "Start practicing together!", style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
                             }

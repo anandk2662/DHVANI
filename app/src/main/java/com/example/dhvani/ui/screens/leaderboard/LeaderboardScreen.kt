@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Whatshot
@@ -170,10 +171,12 @@ fun LeaderboardScreen(
                         } else {
                             itemsIndexed(filteredUsers) { index, user ->
                                 val isMe = user.id == currentUser?.id
+                                val isFriend = currentUser?.friend_ids?.contains(user.id) == true
                                 LeaderboardItem(
                                     rank = index + 1,
                                     user = user,
                                     isCurrentUser = isMe,
+                                    isFriend = isFriend,
                                     onClick = { onUserClick(user.id) }
                                 )
                             }
@@ -219,7 +222,7 @@ fun LeagueTab(league: League, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun LeaderboardItem(rank: Int, user: UserProfile, isCurrentUser: Boolean, onClick: () -> Unit) {
+fun LeaderboardItem(rank: Int, user: UserProfile, isCurrentUser: Boolean, isFriend: Boolean, onClick: () -> Unit) {
     val league = League.getByXp(user.xp_points)
     
     Surface(
@@ -357,13 +360,22 @@ fun LeaderboardItem(rank: Int, user: UserProfile, isCurrentUser: Boolean, onClic
             
             Spacer(modifier = Modifier.width(8.dp))
             
-            IconButton(
-                onClick = { /* Add Friend Logic */ },
-                colors = IconButtonDefaults.iconButtonColors(
-                    contentColor = PrimaryGreen
+            if (!isCurrentUser && !isFriend) {
+                IconButton(
+                    onClick = { /* Navigation to profile handled by item click */ },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        contentColor = PrimaryGreen
+                    )
+                ) {
+                    Icon(Icons.Default.PersonAdd, contentDescription = "Add Friend", modifier = Modifier.size(22.dp))
+                }
+            } else if (isFriend) {
+                Icon(
+                    Icons.Default.Check, 
+                    contentDescription = "Already Friend", 
+                    tint = PrimaryGreen,
+                    modifier = Modifier.size(22.dp)
                 )
-            ) {
-                Icon(Icons.Default.PersonAdd, contentDescription = "Add Friend", modifier = Modifier.size(22.dp))
             }
         }
     }

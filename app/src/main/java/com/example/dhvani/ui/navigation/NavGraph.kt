@@ -212,6 +212,9 @@ fun AppNavGraph(
                     navController.navigate(Screen.Welcome.route) {
                         popUpTo(0) { inclusive = true }
                     }
+                },
+                onUserClick = { userId ->
+                    navController.navigate(Screen.OtherProfile.createRoute(userId))
                 }
             )
         }
