@@ -82,7 +82,7 @@ class QuizViewModel @Inject constructor(
             _imageWidth.value = imageWidth
             _rotationDegrees.value = rotationDegrees
             
-            inferenceManager.predictOnDevice(result)
+            inferenceManager.predictRemote(result)
         }
     }
 

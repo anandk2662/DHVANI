@@ -172,10 +172,12 @@ fun AiUrlDialog(
 
 @Composable
 fun ProfileHeader(profile: UserProfile?) {
+    val league = com.example.dhvani.data.model.League.getByIndex((profile?.xp_points ?: 0) / 500)
+    
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(260.dp)
+            .height(280.dp)
     ) {
         Box(
             modifier = Modifier
@@ -188,24 +190,43 @@ fun ProfileHeader(profile: UserProfile?) {
             modifier = Modifier.align(Alignment.BottomCenter),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Surface(
-                modifier = Modifier
-                    .size(120.dp)
-                    .border(4.dp, Color.White, CircleShape),
-                shape = CircleShape,
-                color = LightBackground,
-                shadowElevation = 8.dp
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text("👤", fontSize = 64.sp)
+            Box {
+                Surface(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .border(4.dp, Color.White, CircleShape),
+                    shape = CircleShape,
+                    color = LightBackground,
+                    shadowElevation = 8.dp
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("👤", fontSize = 64.sp)
+                    }
+                }
+                
+                // League Badge
+                Surface(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .align(Alignment.BottomEnd)
+                        .offset(x = (-4).dp, y = (-4).dp),
+                    shape = CircleShape,
+                    color = league.color,
+                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                    shadowElevation = 4.dp
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(league.trophyEmoji, fontSize = 20.sp)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(profile?.full_name ?: "Guest User", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("@${profile?.username ?: "guest"} • ${profile?.region ?: "Unknown Region"}", color = Color.Gray)
+            Text("@${profile?.username ?: "guest"} • ${league.leagueName} League", color = Color.Gray)
         }
     }
 }
+
 
 @Composable
 fun StatCard(label: String, value: String, icon: ImageVector, color: Color, modifier: Modifier = Modifier) {

@@ -17,6 +17,7 @@ import com.example.dhvani.ui.screens.onboarding.LevelSelectionScreen
 import com.example.dhvani.ui.screens.onboarding.SplashScreen
 import com.example.dhvani.ui.screens.onboarding.WelcomeScreen
 import com.example.dhvani.ui.screens.practice.PracticeScreen
+import com.example.dhvani.ui.screens.profile.OtherProfileScreen
 import com.example.dhvani.ui.screens.profile.ProfileScreen
 import com.example.dhvani.ui.screens.quiz.OfflineQuizScreen
 import com.example.dhvani.ui.screens.lesson.LessonScreen
@@ -114,7 +115,20 @@ fun AppNavGraph(
                         navController.navigate(Screen.Login.route)
                     }
                 },
-                onLeaderboardClick = { }
+                onLeaderboardClick = { },
+                onUserClick = { userId ->
+                    navController.navigate(Screen.OtherProfile.createRoute(userId))
+                }
+            )
+        }
+        composable(
+            route = Screen.OtherProfile.route,
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            OtherProfileScreen(
+                userId = userId,
+                onBackClick = { navController.popBackStack() }
             )
         }
         composable(Screen.Home.route) {

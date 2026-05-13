@@ -72,6 +72,8 @@ dependencies {
     implementation(libs.supabase.storage)
     implementation(libs.supabase.realtime)
     implementation(libs.ktor.client.android)
+    implementation(libs.ktor.content.negotiation)
+    implementation(libs.ktor.serialization.json)
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)
@@ -88,7 +90,10 @@ dependencies {
 
     // MediaPipe & TFLite
     implementation(libs.mediapipe.vision)
-    implementation(libs.tensorflow.lite)
+    implementation(libs.tflite)
+    implementation(libs.tflite.gpu)
+    implementation(libs.tflite.gpuapi)
+    implementation(libs.tflite.support)
 
     // Media3
     implementation(libs.androidx.media3.exoplayer)
@@ -100,6 +105,11 @@ dependencies {
 
     // Coil
     implementation(libs.coil.compose)
+
+    // Retrofit
+    implementation(libs.retrofit.core)
+    implementation(libs.retrofit.serialization)
+    implementation(libs.okhttp.logging)
 
     // Security
     implementation(libs.androidx.security.crypto)
