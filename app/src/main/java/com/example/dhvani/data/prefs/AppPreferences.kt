@@ -24,10 +24,20 @@ class AppPreferences @Inject constructor(
         get() = prefs.getStringSet(KEY_PRACTICED_SIGNS, emptySet())?.toSet() ?: emptySet()
         set(value) = prefs.edit().putStringSet(KEY_PRACTICED_SIGNS, value).apply()
 
+    fun getSignMastery(signId: String): Float {
+        return prefs.getFloat("mastery_$signId", 0f)
+    }
+
+    fun updateSignMastery(signId: String, delta: Float) {
+        val current = getSignMastery(signId)
+        val newValue = (current + delta).coerceIn(0f, 1f)
+        prefs.edit().putFloat("mastery_$signId", newValue).apply()
+    }
+
     companion object {
         private const val KEY_AI_URL = "ai_model_url"
         private const val KEY_COMPLETED_LESSONS = "completed_lessons"
         private const val KEY_PRACTICED_SIGNS = "practiced_signs"
-        private const val DEFAULT_URL = "https://api-inference.huggingface.co/models/google/mediapipe-hand-landmarks"
+        private const val DEFAULT_URL = "https://d77c3bnw-9999.inc1.devtunnels.ms/sign"
     }
 }

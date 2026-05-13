@@ -12,6 +12,7 @@ import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult
 
 class HandLandmarkerHelper(
     val context: Context,
+    private var currentDelegate: Delegate = Delegate.CPU,
     val resultListener: LandmarkerListener? = null
 ) {
     companion object {
@@ -28,11 +29,20 @@ class HandLandmarkerHelper(
         setupHandLandmarker()
     }
 
+    fun setDelegate(delegate: Delegate) {
+        if (currentDelegate != delegate) {
+            currentDelegate = delegate
+            setupHandLandmarker()
+        }
+    }
+
     private fun setupHandLandmarker() {
         try {
+            handLandmarker?.close() // Close old instance
+            
             val baseOptionsBuilder = BaseOptions.builder()
                 .setModelAssetPath(MODEL_ASSET_PATH)
-                .setDelegate(Delegate.CPU)
+                .setDelegate(currentDelegate)
             
             val optionsBuilder = HandLandmarker.HandLandmarkerOptions.builder()
                 .setBaseOptions(baseOptionsBuilder.build())

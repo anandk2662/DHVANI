@@ -31,7 +31,10 @@ data class UserProfile(
     val current_streak: Int = 0,
     val last_active_date: String? = null,
     val login_streak: Int = 0,
-    val created_at: String? = null
+    val created_at: String? = null,
+    val league_index: Int = 0, // 0 to 9 for 10 leagues
+    val friend_ids: List<String> = emptyList(),
+    val shared_streaks: Map<String, Int> = emptyMap() // Map<FriendId, StreakCount>
 )
 
 @Singleton
@@ -172,14 +175,20 @@ class AuthRepository @Inject constructor(
 
     suspend fun addXp(points: Int) {
         val profile = _currentUserProfile.value ?: return
-        val updatedProfile = profile.copy(xp_points = profile.xp_points + points)
+        val newXp = profile.xp_points + points
+        val newLeague = com.example.dhvani.data.model.League.getByXp(newXp)
+        
+        val updatedProfile = profile.copy(
+            xp_points = newXp,
+            league_index = newLeague.id
+        )
         
         // Update local state immediately
         _currentUserProfile.value = updatedProfile
         
         try {
             updateProfile(updatedProfile)
-            android.util.Log.d("AuthRepository", "XP updated in DB for ${profile.id}")
+            android.util.Log.d("AuthRepository", "XP and League updated in DB for ${profile.id}")
         } catch (e: Exception) {
             android.util.Log.e("AuthRepository", "Failed to update XP in DB: ${e.message}")
         }

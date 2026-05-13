@@ -71,18 +71,25 @@ class OverlayView(context: Context, attrs: AttributeSet?) : View(context, attrs)
         var nx = x()
         var ny = y()
         
-        // 3. Dynamic orientation detection and remapping
-        val orientation = context.resources.configuration.orientation
-        val isPortrait = orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
-        
-        // Remap landscape-sensor landmarks to upright portrait if needed
-        if (isPortrait) {
-            val temp = nx
-            nx = ny
-            ny = 1.0f - temp
+        // 3. Remap landmarks based on rotationDegrees to match screen orientation
+        when (rotationDegrees) {
+            90 -> {
+                val temp = nx
+                nx = 1.0f - ny
+                ny = temp
+            }
+            180 -> {
+                nx = 1.0f - nx
+                ny = 1.0f - ny
+            }
+            270 -> {
+                val temp = nx
+                nx = ny
+                ny = 1.0f - temp
+            }
         }
         
-        // 4. Mirroring (Applied after orientation correction)
+        // 4. Mirroring (Applied for front camera)
         if (isFrontCamera) {
             nx = 1.0f - nx
         }
@@ -105,12 +112,10 @@ class OverlayView(context: Context, attrs: AttributeSet?) : View(context, attrs)
         val nx = (v.x / aspect) + 0.5f
         val ny = 0.5f - v.y
         
-        val orientation = context.resources.configuration.orientation
-        val isPortrait = orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
-        
-        // Upright logical dimensions
-        val lw = if (isPortrait) imageHeight else imageWidth
-        val lh = if (isPortrait) imageWidth else imageHeight
+        // Upright logical dimensions based on rotation
+        val isRotated = rotationDegrees == 90 || rotationDegrees == 270
+        val lw = if (isRotated) imageHeight else imageWidth
+        val lh = if (isRotated) imageWidth else imageHeight
         
         // Scale to logical pixels and center in View (FILL_CENTER)
         val px = (nx - 0.5f) * lw * scale + width / 2f
@@ -122,12 +127,10 @@ class OverlayView(context: Context, attrs: AttributeSet?) : View(context, attrs)
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
         results?.let { handLandmarkerResult ->
-            val orientation = context.resources.configuration.orientation
-            val isPortrait = orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
-            
             // Logical dimensions of the upright image
-            val lw = if (isPortrait) imageHeight else imageWidth
-            val lh = if (isPortrait) imageWidth else imageHeight
+            val isRotated = rotationDegrees == 90 || rotationDegrees == 270
+            val lw = if (isRotated) imageHeight else imageWidth
+            val lh = if (isRotated) imageWidth else imageHeight
             
             // 8. Calculate FILL_CENTER scaling to the View's dimensions
             val scale = Math.max(width.toFloat() / lw, height.toFloat() / lh)

@@ -164,30 +164,35 @@ fun OfflineQuizScreen(
 
 @Composable
 fun PredictionOverlay(res: com.example.dhvani.ml.PredictionResult) {
-    if (res.accuracy > 40) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(16.dp).height(60.dp),
-            color = Color.Black.copy(alpha = 0.6f),
-            shape = RoundedCornerShape(12.dp)
+    val isConfirmed = res.confidence >= 0.7f
+    
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(16.dp).height(60.dp),
+        color = Color.Black.copy(alpha = 0.6f),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("Predicted:", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
-                    Text(res.prediction, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                }
-                
-                CircularProgressIndicator(
-                    progress = { res.accuracy / 100f },
-                    modifier = Modifier.size(36.dp),
-                    color = if (res.accuracy >= 80) SuccessGreen else Color.White,
-                    trackColor = Color.White.copy(alpha = 0.2f),
-                    strokeWidth = 4.dp
+            Column {
+                Text("Predicted:", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
+                Text(
+                    text = if (isConfirmed) res.prediction else "Unknown",
+                    color = if (isConfirmed) SuccessGreen else Color.Red,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
                 )
             }
+            
+            CircularProgressIndicator(
+                progress = { res.confidence },
+                modifier = Modifier.size(36.dp),
+                color = if (isConfirmed) SuccessGreen else Color.Red,
+                trackColor = Color.White.copy(alpha = 0.2f),
+                strokeWidth = 4.dp
+            )
         }
     }
 }
@@ -274,7 +279,7 @@ fun QuizCameraPreview(viewModel: QuizViewModel) {
     val previewView = remember { PreviewView(context) }
     
     val helper = remember {
-        HandLandmarkerHelper(context, viewModel)
+        HandLandmarkerHelper(context, resultListener = viewModel)
     }
 
     LaunchedEffect(Unit) {
