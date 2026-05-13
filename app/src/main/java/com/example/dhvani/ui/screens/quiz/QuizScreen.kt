@@ -39,7 +39,7 @@ fun QuizScreen(
                 IconButton(onClick = onBack) {
                     Icon(Icons.Default.Close, contentDescription = null)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(24.dp))
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier
@@ -49,7 +49,7 @@ fun QuizScreen(
                     color = PrimaryGreen,
                     trackColor = PrimaryGreen.copy(alpha = 0.1f)
                 )
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(48.dp))
                 Text("💎 12", fontWeight = FontWeight.Bold)
             }
         }
@@ -113,12 +113,12 @@ fun QuizOption(icon: String, label: String) {
         color = if (isSelected) PrimaryGreen.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surface
     ) {
         Row(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(36.dp)
                     .background(Color.LightGray.copy(alpha = 0.1f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {

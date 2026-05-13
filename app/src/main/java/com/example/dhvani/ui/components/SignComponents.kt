@@ -91,27 +91,7 @@ fun QuizOptionCard(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (sign.assetPath.endsWith(".mp4", ignoreCase = true)) {
-                VideoSignPlayer(
-                    assetPath = sign.assetPath,
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                )
-            } else {
-                val imagePath = "file:///android_asset/${sign.assetPath}"
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(imagePath)
-                        .build(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
+
             Text(
                 text = sign.label,
                 style = MaterialTheme.typography.titleLarge,

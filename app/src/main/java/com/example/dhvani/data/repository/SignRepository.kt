@@ -7,12 +7,10 @@ import com.example.dhvani.data.model.SignItem
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-
 import com.example.dhvani.data.model.*
 import com.example.dhvani.data.prefs.AppPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
 import com.example.dhvani.data.SignData
 import java.util.Locale
 
