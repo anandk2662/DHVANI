@@ -18,7 +18,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import coil.request.ImageRequest
 import com.example.dhvani.data.model.SignItem
 
@@ -108,55 +111,80 @@ fun DictionaryItemCard(
     sign: SignItem,
     modifier: Modifier = Modifier
 ) {
+    var isExpanded by remember { mutableStateOf(false) }
     var showFullScreen by remember { mutableStateOf(false) }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { showFullScreen = true },
+            .clickable { isExpanded = !isExpanded },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (sign.assetPath.endsWith(".mp4", ignoreCase = true)) {
-                VideoSignPlayer(
-                    assetPath = sign.assetPath,
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                )
-            } else {
-                val imagePath = "file:///android_asset/${sign.assetPath}"
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(imagePath)
-                        .build(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop
+        Column {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = sign.label,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = when (sign.category) {
+                            com.example.dhvani.data.model.SignCategory.ALPHABET -> "Alphabet"
+                            com.example.dhvani.data.model.SignCategory.NUMBER -> "Number"
+                            else -> sign.category.name.lowercase().replaceFirstChar { it.uppercase() }
+                        },
+                        color = Color.Gray
+                    )
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = Color.Gray
                 )
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = sign.label,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Text(
-                    text = when (sign.category) {
-                        com.example.dhvani.data.model.SignCategory.ALPHABET -> "Alphabet"
-                        com.example.dhvani.data.model.SignCategory.NUMBER -> "Number"
-                        else -> sign.category.name.lowercase().replaceFirstChar { it.uppercase() }
-                    },
-                    color = Color.Gray
-                )
+
+            if (isExpanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (sign.assetPath.endsWith(".mp4", ignoreCase = true)) {
+                        VideoSignPlayer(
+                            assetPath = sign.assetPath,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                    } else {
+                        val imagePath = "file:///android_asset/${sign.assetPath}"
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(imagePath)
+                                .build(),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                }
+                
+                TextButton(
+                    onClick = { showFullScreen = true },
+                    modifier = Modifier.align(Alignment.End).padding(end = 8.dp, bottom = 8.dp)
+                ) {
+                    Text("FULL SCREEN")
+                }
             }
         }
     }

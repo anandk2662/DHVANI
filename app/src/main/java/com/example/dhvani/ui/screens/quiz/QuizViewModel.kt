@@ -3,20 +3,25 @@ package com.example.dhvani.ui.screens.quiz
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.dhvani.data.model.QuizQuestion
+import com.example.dhvani.data.model.SignCategory
 import com.example.dhvani.data.model.SignItem
 import com.example.dhvani.data.repository.SignRepository
 import com.example.dhvani.gamification.GamificationEngine
+import com.example.dhvani.data.prefs.AppPreferences
+import com.example.dhvani.ml.ModelInferenceManager
+import com.example.dhvani.ml.PredictionResult
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class QuizViewModel @Inject constructor(
     private val repository: SignRepository,
-    private val gamificationEngine: GamificationEngine
-) : ViewModel() {
+    private val gamificationEngine: GamificationEngine,
+    private val preferences: AppPreferences,
+    private val inferenceManager: ModelInferenceManager
+) : ViewModel(), com.example.dhvani.ml.HandLandmarkerHelper.LandmarkerListener {
 
     private val _questions = MutableStateFlow<List<QuizQuestion>>(emptyList())
     val questions = _questions.asStateFlow()
@@ -30,15 +35,86 @@ class QuizViewModel @Inject constructor(
     private val _isFinished = MutableStateFlow(false)
     val isFinished = _isFinished.asStateFlow()
 
+    // Camera Support
+    private val _predictionResult = inferenceManager.prediction
+    val predictionResult = _predictionResult
+
+    private val _latestResult = MutableStateFlow<com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult?>(null)
+    val latestResult = _latestResult.asStateFlow()
+
+    private val _imageHeight = MutableStateFlow(0)
+    val imageHeight = _imageHeight.asStateFlow()
+
+    private val _imageWidth = MutableStateFlow(0)
+    val imageWidth = _imageWidth.asStateFlow()
+
+    private val _rotationDegrees = MutableStateFlow(0)
+    val rotationDegrees = _rotationDegrees.asStateFlow()
+
     init {
-        startNewQuiz()
+        // Default startup if needed, but usually triggered by UI
+        // startNewQuiz()
+        observePredictions()
     }
 
-    fun startNewQuiz() {
-        _questions.value = repository.getRandomQuiz()
+    private fun observePredictions() {
+        viewModelScope.launch {
+            predictionResult.collectLatest { result ->
+                val currentQuestion = _questions.value.getOrNull(_currentQuestionIndex.value) ?: return@collectLatest
+                
+                if (inferenceManager.canSubmitPrediction(currentQuestion.correctAnswer.label)) {
+                    inferenceManager.markAccepted()
+                    submitAnswer(currentQuestion.correctAnswer)
+                }
+            }
+        }
+    }
+
+    override fun onResults(
+        result: com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult,
+        imageHeight: Int,
+        imageWidth: Int,
+        rotationDegrees: Int
+    ) {
+        viewModelScope.launch {
+            _latestResult.value = result
+            _imageHeight.value = imageHeight
+            _imageWidth.value = imageWidth
+            _rotationDegrees.value = rotationDegrees
+            
+            inferenceManager.predictOnDevice(result)
+        }
+    }
+
+    override fun onError(error: String) {
+        // Handle camera error
+    }
+
+    private val _timer = MutableStateFlow(30)
+    val timer = _timer.asStateFlow()
+
+    private var timerJob: kotlinx.coroutines.Job? = null
+
+    fun startNewQuiz(category: SignCategory = SignCategory.ALPHABET, difficulty: SignRepository.QuizDifficulty = SignRepository.QuizDifficulty.MEDIUM) {
+        _questions.value = repository.generateQuiz(category, count = 10, difficulty = difficulty)
         _currentQuestionIndex.value = 0
         _score.value = 0
         _isFinished.value = false
+        startTimer()
+    }
+
+    private fun startTimer() {
+        timerJob?.cancel()
+        _timer.value = 30
+        timerJob = viewModelScope.launch {
+            while (_timer.value > 0 && !_isFinished.value) {
+                kotlinx.coroutines.delay(1000)
+                _timer.value--
+            }
+            if (_timer.value == 0) {
+                _isFinished.value = true
+            }
+        }
     }
 
     fun submitAnswer(answer: SignItem) {
@@ -47,16 +123,28 @@ class QuizViewModel @Inject constructor(
             _score.value++
             viewModelScope.launch {
                 gamificationEngine.onCorrectAnswer()
+                
+                // Add to practiced signs
+                val practiced = preferences.practicedSigns.toMutableSet()
+                practiced.add(answer.id)
+                preferences.practicedSigns = practiced
             }
         }
 
         if (_currentQuestionIndex.value < _questions.value.size - 1) {
             _currentQuestionIndex.value++
+            _timer.value = 30 // Reset timer for next question
         } else {
             _isFinished.value = true
+            timerJob?.cancel()
             viewModelScope.launch {
                 gamificationEngine.onQuizCompleted(perfect = _score.value == _questions.value.size)
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        timerJob?.cancel()
     }
 }

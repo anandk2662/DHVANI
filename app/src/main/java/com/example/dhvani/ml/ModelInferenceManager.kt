@@ -1,23 +1,9 @@
 package com.example.dhvani.ml
 
-import com.example.dhvani.data.prefs.AppPreferences
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.engine.android.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.decodeFromJsonElement
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,122 +15,86 @@ data class PredictionResult(
     val status: String
 )
 
-@Serializable
-data class LandmarkItem(
-    val id: Int,
-    val x: Float,
-    val y: Float,
-    val z: Float
-)
-
-@Serializable
-data class HandLandmarksMap(
-    val left: List<LandmarkItem>? = null,
-    val right: List<LandmarkItem>? = null
-)
-
-@Serializable
-data class SignInferenceRequest(
-    val sign: String, // "alphabet" or "words"
-    val landmarks: HandLandmarksMap,
-    val timestamp: Long? = null
-)
-
-@Serializable
-data class SignInferenceResponse(
-    val status: Int,
-    val message: String,
-    val data: JsonElement? = null
-)
-
 @Singleton
 class ModelInferenceManager @Inject constructor(
-    private val preferences: AppPreferences
+    private val handModelInference: HandModelInference
 ) {
     private val _prediction = MutableStateFlow<PredictionResult?>(null)
     val prediction = _prediction.asStateFlow()
 
-    private val jsonConfig = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
+    private val featureExtractor = FeatureExtractor()
 
-    private val client = HttpClient(Android) {
-        install(ContentNegotiation) {
-            json(jsonConfig)
-        }
-    }
+    // Majority voting buffer for stabilization
+    private val predictionBuffer = mutableListOf<String>()
+    private val BUFFER_SIZE = 15 // Increased for better stability
+    
+    // Cooldown to prevent accidental double-submissions
+    private var lastAcceptedTime = 0L
+    private val COOLDOWN_MS = 2000L
 
-    private val inferenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /**
+     * Complete on-device inference using TFLite and local feature extraction.
+     */
+    fun predictOnDevice(result: HandLandmarkerResult) {
+        val features = featureExtractor.extractFeatures(result)
+        
+        // Hand Detection Validation: Check presence flags at index 0 and 27
+        val leftHandPresent = features[0] == 1f
+        val rightHandPresent = features[27] == 1f
 
-    fun predictSign(
-        isAlphabet: Boolean,
-        leftHand: List<SignLandmark>? = null,
-        rightHand: List<SignLandmark>? = null
-    ) {
-        val leftItems = leftHand?.mapIndexed { i, lm -> LandmarkItem(i, lm.x, lm.y, lm.z) }
-        val rightItems = rightHand?.mapIndexed { i, lm -> LandmarkItem(i, lm.x, lm.y, lm.z) }
-
-        if (leftItems == null && rightItems == null) {
-            _prediction.value = null
+        if (!leftHandPresent && !rightHandPresent) {
+            _prediction.value = PredictionResult(
+                prediction = "No Hand Detected",
+                confidence = 0f,
+                accuracy = 0,
+                status = "GUIDANCE: Place your hand in the frame"
+            )
+            predictionBuffer.clear()
             return
         }
 
-        val request = SignInferenceRequest(
-            sign = if (isAlphabet) "alphabet" else "words",
-            landmarks = HandLandmarksMap(left = leftItems, right = rightItems),
-            timestamp = if (!isAlphabet) System.currentTimeMillis() else null
-        )
+        val (predictedLabel, confidence) = handModelInference.runInference(features)
 
-        inferenceScope.launch {
-            try {
-                var baseUrl = preferences.aiModelUrl
-                
-                // Special case for default/unconfigured URL
-                if (baseUrl.contains("mediapipe-hand-landmarks")) {
-                    simulateInference()
-                    return@launch
-                }
-
-                // Ensure URL ends with /sign as requested
-                val finalUrl = if (baseUrl.endsWith("/sign")) {
-                    baseUrl
-                } else if (baseUrl.endsWith("/")) {
-                    "${baseUrl}sign"
-                } else {
-                    "$baseUrl/sign"
-                }
-
-                val response: SignInferenceResponse = client.post(finalUrl) {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }.body()
-
-                if (response.status == 200 && response.data != null) {
-                    // Assuming 'data' contains the PredictionResult format
-                    val result = jsonConfig.decodeFromJsonElement<PredictionResult>(response.data)
-                    _prediction.value = result
-                } else {
-                    _prediction.value = PredictionResult(
-                        prediction = "Error",
-                        confidence = 0f,
-                        accuracy = 0,
-                        status = response.message
-                    )
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("Inference", "API Failed: ${e.message}")
-                simulateInference()
-            }
+        // Smoothing: Add to buffer
+        predictionBuffer.add(predictedLabel)
+        if (predictionBuffer.size > BUFFER_SIZE) {
+            predictionBuffer.removeAt(0)
         }
+
+        // Majority Voting
+        val smoothedPrediction = predictionBuffer
+            .groupingBy { it }
+            .eachCount()
+            .maxByOrNull { it.value }
+            ?.key ?: predictedLabel
+
+        // Debounce & Confidence Threshold
+        val isStable = predictionBuffer.count { it == smoothedPrediction } > (BUFFER_SIZE * 0.7)
+        val finalConfidence = if (isStable) confidence else confidence * 0.5f
+
+        _prediction.value = PredictionResult(
+            prediction = smoothedPrediction,
+            confidence = finalConfidence,
+            accuracy = (finalConfidence * 100).toInt(),
+            status = when {
+                finalConfidence >= 0.8f -> "STABLE"
+                finalConfidence >= 0.5f -> "HOLD STEADY"
+                else -> "ADJUST HAND"
+            }
+        )
     }
 
-    private fun simulateInference() {
-        _prediction.value = PredictionResult(
-            prediction = "A",
-            confidence = 0.94f,
-            accuracy = 94,
-            status = "Local Mock Success"
-        )
+    fun canSubmitPrediction(label: String): Boolean {
+        val current = _prediction.value ?: return false
+        val now = System.currentTimeMillis()
+        
+        return current.prediction.equals(label, ignoreCase = true) && 
+               current.accuracy >= 80 && 
+               (now - lastAcceptedTime) > COOLDOWN_MS
+    }
+
+    fun markAccepted() {
+        lastAcceptedTime = System.currentTimeMillis()
+        predictionBuffer.clear()
     }
 }

@@ -14,6 +14,10 @@ class HandLandmarkerHelper(
     val context: Context,
     val resultListener: LandmarkerListener? = null
 ) {
+    companion object {
+        private const val MODEL_ASSET_PATH = "hand_landmarker.task"
+    }
+
     private var handLandmarker: HandLandmarker? = null
     
     private var lastImageWidth: Int = 0
@@ -27,7 +31,7 @@ class HandLandmarkerHelper(
     private fun setupHandLandmarker() {
         try {
             val baseOptionsBuilder = BaseOptions.builder()
-                .setModelAssetPath("hand_landmarker.task")
+                .setModelAssetPath(MODEL_ASSET_PATH)
                 .setDelegate(Delegate.CPU)
             
             val optionsBuilder = HandLandmarker.HandLandmarkerOptions.builder()
@@ -38,9 +42,6 @@ class HandLandmarkerHelper(
                 .setNumHands(2)
                 .setRunningMode(RunningMode.LIVE_STREAM)
                 .setResultListener { result, _ ->
-                    // Pass raw sensor dimensions and rotation to the listener.
-                    // MediaPipe returns landmarks relative to the sensor frame 
-                    // BUT they are normalized [0, 1].
                     resultListener?.onResults(
                         result, 
                         lastImageHeight, 
@@ -73,11 +74,9 @@ class HandLandmarkerHelper(
             lastImageHeight = imageProxy.height
             lastRotation = rotationDegrees
 
-            // Use the raw bitmap from the sensor.
             val bitmap = imageProxy.toBitmap()
             val mpImage = BitmapImageBuilder(bitmap).build()
             
-            // We tell MediaPipe the rotation so it can detect hands correctly.
             val imageProcessingOptions = ImageProcessingOptions.builder()
                 .setRotationDegrees(rotationDegrees)
                 .build()

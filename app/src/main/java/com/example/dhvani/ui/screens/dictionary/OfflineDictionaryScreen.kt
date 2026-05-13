@@ -33,14 +33,8 @@ fun OfflineDictionaryScreen(
     viewModel: DictionaryViewModel = hiltViewModel()
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val allSigns by viewModel.allSigns.collectAsState()
+    val filteredSigns by viewModel.filteredSigns.collectAsState()
     
-    val filteredSigns = if (searchQuery.isEmpty()) {
-        allSigns
-    } else {
-        allSigns.filter { it.label.contains(searchQuery, ignoreCase = true) }
-    }
-
     Scaffold(
         bottomBar = {
             FloatingBottomBar(
@@ -70,7 +64,10 @@ fun OfflineDictionaryScreen(
             
             TextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = { 
+                    searchQuery = it
+                    viewModel.onSearchQueryChange(it)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White, RoundedCornerShape(16.dp)),
