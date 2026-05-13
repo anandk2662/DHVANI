@@ -94,8 +94,10 @@ class QuizViewModel @Inject constructor(
     val timer = _timer.asStateFlow()
 
     private var timerJob: kotlinx.coroutines.Job? = null
+    private var currentQuizId: String? = null
 
     fun startNewQuiz(category: SignCategory = SignCategory.ALPHABET, difficulty: SignRepository.QuizDifficulty = SignRepository.QuizDifficulty.MEDIUM) {
+        currentQuizId = "quiz_${category.name}_${difficulty.name}"
         _questions.value = repository.generateQuiz(category, count = 10, difficulty = difficulty)
         _currentQuestionIndex.value = 0
         _score.value = 0
@@ -112,7 +114,7 @@ class QuizViewModel @Inject constructor(
                 _timer.value--
             }
             if (_timer.value == 0) {
-                _isFinished.value = true
+                finishQuiz()
             }
         }
     }
@@ -122,7 +124,10 @@ class QuizViewModel @Inject constructor(
         if (answer == currentQuestion.correctAnswer) {
             _score.value++
             viewModelScope.launch {
-                gamificationEngine.onCorrectAnswer()
+                val isSolved = preferences.completedQuizzes.contains(currentQuizId)
+                if (!isSolved) {
+                    gamificationEngine.onCorrectAnswer()
+                }
                 
                 // Add to practiced signs
                 val practiced = preferences.practicedSigns.toMutableSet()
@@ -135,10 +140,26 @@ class QuizViewModel @Inject constructor(
             _currentQuestionIndex.value++
             _timer.value = 30 // Reset timer for next question
         } else {
-            _isFinished.value = true
-            timerJob?.cancel()
-            viewModelScope.launch {
+            finishQuiz()
+        }
+    }
+
+    private fun finishQuiz() {
+        _isFinished.value = true
+        timerJob?.cancel()
+        viewModelScope.launch {
+            val isSolved = preferences.completedQuizzes.contains(currentQuizId)
+            if (!isSolved) {
                 gamificationEngine.onQuizCompleted(perfect = _score.value == _questions.value.size)
+                
+                // Mark as solved if score is decent (e.g. > 70%)
+                if (_score.value >= _questions.value.size * 0.7) {
+                    currentQuizId?.let { id ->
+                        val solved = preferences.completedQuizzes.toMutableSet()
+                        solved.add(id)
+                        preferences.completedQuizzes = solved
+                    }
+                }
             }
         }
     }

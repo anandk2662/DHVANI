@@ -32,9 +32,9 @@ data class UserProfile(
     val last_active_date: String? = null,
     val login_streak: Int = 0,
     val created_at: String? = null,
-    val league_index: Int = 0, // 0 to 9 for 10 leagues
-    val friend_ids: List<String> = emptyList(),
-    val shared_streaks: Map<String, Int> = emptyMap() // Map<FriendId, StreakCount>
+    val league_index: Int = 0,
+    val friend_ids: List<String>? = emptyList(),
+    val shared_streaks: Map<String, Int>? = emptyMap()
 )
 
 @Singleton
@@ -147,13 +147,16 @@ class AuthRepository @Inject constructor(
 
     suspend fun getProfile(): UserProfile? {
         val userId = supabaseClient.auth.currentUserOrNull()?.id ?: return null
+        return getProfileById(userId)?.also {
+            _currentUserProfile.value = it
+        }
+    }
+
+    suspend fun getProfileById(userId: String): UserProfile? {
         return try {
-            val profile = supabaseClient.postgrest["profiles"]
+            supabaseClient.postgrest["profiles"]
                 .select { filter { eq("id", userId) } }
                 .decodeSingleOrNull<UserProfile>()
-            
-            _currentUserProfile.value = profile
-            profile
         } catch (e: Exception) {
             null
         }
@@ -215,12 +218,14 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    suspend fun getLeaderboard(): List<UserProfile> {
+    suspend fun getLeaderboard(leagueId: Int? = null): List<UserProfile> {
         return try {
+            // Fetch top 100 users globally. Filtering by league is handled 
+            // in the UI/ViewModel to ensure it works even if league_index column is missing.
             supabaseClient.postgrest["profiles"]
                 .select {
                     order("xp_points", Order.DESCENDING)
-                    limit(20)
+                    limit(100)
                 }
                 .decodeList<UserProfile>()
         } catch (e: Exception) {

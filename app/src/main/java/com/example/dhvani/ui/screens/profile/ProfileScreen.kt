@@ -172,7 +172,7 @@ fun AiUrlDialog(
 
 @Composable
 fun ProfileHeader(profile: UserProfile?) {
-    val league = com.example.dhvani.data.model.League.getByIndex((profile?.xp_points ?: 0) / 500)
+    val league = com.example.dhvani.data.model.League.getByXp(profile?.xp_points ?: 0)
     
     Box(
         modifier = Modifier

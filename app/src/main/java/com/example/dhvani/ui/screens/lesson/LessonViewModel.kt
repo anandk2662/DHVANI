@@ -87,8 +87,14 @@ class LessonViewModel @Inject constructor(
     private fun completeLesson() {
         viewModelScope.launch {
             val currentLesson = _lesson.value ?: return@launch
+            val wasCompleted = currentLesson.status == com.example.dhvani.data.model.LessonStatus.COMPLETED
+            
             signRepository.completeLesson(currentLesson.id)
-            gamificationEngine.onLessonCompleted(perfect = true)
+            
+            if (!wasCompleted) {
+                gamificationEngine.onLessonCompleted(perfect = true)
+            }
+
             _isCompleted.value = true
         }
     }

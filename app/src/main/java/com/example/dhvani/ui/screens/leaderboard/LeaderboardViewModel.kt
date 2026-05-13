@@ -21,14 +21,18 @@ class LeaderboardViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
+    val currentUser = authRepository.currentUserProfile
+
     init {
+        // Initial fetch for whatever the default is, 
+        // will be updated by Screen when it detects current user's league
         fetchLeaderboard()
     }
 
-    fun fetchLeaderboard() {
+    fun fetchLeaderboard(leagueId: Int? = null) {
         viewModelScope.launch {
             _isLoading.value = true
-            val result = authRepository.getLeaderboard()
+            val result = authRepository.getLeaderboard(leagueId)
             _users.value = result
             _isLoading.value = false
         }

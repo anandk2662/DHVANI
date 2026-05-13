@@ -24,6 +24,10 @@ class AppPreferences @Inject constructor(
         get() = prefs.getStringSet(KEY_PRACTICED_SIGNS, emptySet())?.toSet() ?: emptySet()
         set(value) = prefs.edit().putStringSet(KEY_PRACTICED_SIGNS, value).apply()
 
+    var completedQuizzes: Set<String>
+        get() = prefs.getStringSet(KEY_COMPLETED_QUIZZES, emptySet())?.toSet() ?: emptySet()
+        set(value) = prefs.edit().putStringSet(KEY_COMPLETED_QUIZZES, value).apply()
+
     fun getSignMastery(signId: String): Float {
         return prefs.getFloat("mastery_$signId", 0f)
     }
@@ -38,6 +42,7 @@ class AppPreferences @Inject constructor(
         private const val KEY_AI_URL = "ai_model_url"
         private const val KEY_COMPLETED_LESSONS = "completed_lessons"
         private const val KEY_PRACTICED_SIGNS = "practiced_signs"
+        private const val KEY_COMPLETED_QUIZZES = "completed_quizzes"
         private const val DEFAULT_URL = "https://d77c3bnw-9999.inc1.devtunnels.ms/sign"
     }
 }

@@ -17,6 +17,9 @@ class ProfileViewModel @Inject constructor(
 
     val profile: StateFlow<UserProfile?> = authRepository.currentUserProfile
 
+    private val _otherProfile = kotlinx.coroutines.flow.MutableStateFlow<UserProfile?>(null)
+    val otherProfile = _otherProfile.asStateFlow()
+
     private val _aiModelUrl = kotlinx.coroutines.flow.MutableStateFlow(preferences.aiModelUrl)
     val aiModelUrl = _aiModelUrl.asStateFlow()
 
@@ -35,7 +38,7 @@ class ProfileViewModel @Inject constructor(
         fetchProfile()
     }
 
-    private fun fetchProfile() {
+    fun fetchProfile() {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
@@ -43,6 +46,21 @@ class ProfileViewModel @Inject constructor(
                 authRepository.getProfile()
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load profile"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun fetchOtherProfile(userId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            try {
+                val result = authRepository.getProfileById(userId)
+                _otherProfile.value = result
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Failed to load user profile"
             } finally {
                 _isLoading.value = false
             }

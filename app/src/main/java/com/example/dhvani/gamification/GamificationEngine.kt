@@ -25,12 +25,16 @@ class GamificationEngine @Inject constructor(
         private val DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE
     }
 
+    private var lastCheckedProfileId: String? = null
+
     init {
         // Observe profile changes to check streak when user logs in
         engineScope.launch {
             authRepository.currentUserProfile.collect { profile ->
-                if (profile != null) {
+                // Only check broken streak once per user ID session to prevent resets on navigation
+                if (profile != null && profile.id != lastCheckedProfileId) {
                     checkAndResetBrokenStreak()
+                    lastCheckedProfileId = profile.id
                 }
             }
         }

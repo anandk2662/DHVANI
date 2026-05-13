@@ -43,7 +43,20 @@ fun LeaderboardScreen(
 ) {
     val users by viewModel.users.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
     var selectedLeagueIndex by remember { mutableIntStateOf(0) }
+
+    // Automatically select current user's league on first load
+    LaunchedEffect(currentUser) {
+        currentUser?.let {
+            selectedLeagueIndex = League.getByXp(it.xp_points).id
+        }
+    }
+
+    // Fetch data when league changes
+    LaunchedEffect(selectedLeagueIndex) {
+        viewModel.fetchLeaderboard(selectedLeagueIndex)
+    }
 
     Scaffold(
         bottomBar = {
@@ -156,9 +169,11 @@ fun LeaderboardScreen(
                             }
                         } else {
                             itemsIndexed(filteredUsers) { index, user ->
+                                val isMe = user.id == currentUser?.id
                                 LeaderboardItem(
                                     rank = index + 1,
                                     user = user,
+                                    isCurrentUser = isMe,
                                     onClick = { onUserClick(user.id) }
                                 )
                             }
@@ -204,17 +219,21 @@ fun LeagueTab(league: League, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun LeaderboardItem(rank: Int, user: UserProfile, onClick: () -> Unit) {
+fun LeaderboardItem(rank: Int, user: UserProfile, isCurrentUser: Boolean, onClick: () -> Unit) {
     val league = League.getByXp(user.xp_points)
     
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
-        shadowElevation = 2.dp,
-        border = if (rank <= 3) androidx.compose.foundation.BorderStroke(1.dp, league.color.copy(alpha = 0.3f)) else null
+        color = if (isCurrentUser) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surface,
+        tonalElevation = if (isCurrentUser) 4.dp else 1.dp,
+        shadowElevation = if (isCurrentUser) 4.dp else 2.dp,
+        border = when {
+            isCurrentUser -> androidx.compose.foundation.BorderStroke(2.dp, PrimaryGreen)
+            rank <= 3 -> androidx.compose.foundation.BorderStroke(1.dp, league.color.copy(alpha = 0.3f))
+            else -> null
+        }
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
