@@ -1,6 +1,7 @@
 package com.example.dhvani.ui.screens.lesson
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -133,8 +134,8 @@ fun LessonScreen(
 fun LearnStepView(sign: SignItem) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("New Sign Learned!", style = MaterialTheme.typography.titleMedium, color = Color.Gray)
-        Text(sign.label, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
-        Spacer(modifier = Modifier.height(24.dp))
+        Text(sign.label, fontSize = 64.sp, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.ExtraBold)
+        Spacer(modifier = Modifier.height(2.dp))
         SignCard(sign = sign, modifier = Modifier.fillMaxSize())
     }
 }
@@ -142,21 +143,47 @@ fun LearnStepView(sign: SignItem) {
 @Composable
 fun QuizStepView(step: LessonStep.Quiz, onComplete: (Boolean) -> Unit) {
     var selectedAnswer by remember { mutableStateOf<SignItem?>(null) }
-    
+    var wrongAnswer by remember { mutableStateOf<SignItem?>(null) }
+
+    LaunchedEffect(selectedAnswer) {
+        if (selectedAnswer != null && selectedAnswer == step.sign) {
+            delay(300) // brief pause so user sees selection before moving on
+            onComplete(true)
+        } else if (selectedAnswer != null && selectedAnswer != step.sign) {
+            wrongAnswer = selectedAnswer
+            selectedAnswer = null
+            onComplete(false)
+        }
+    }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Which sign represents this letter?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(24.dp))
-        SignCard(sign = step.sign, modifier = Modifier.height(260.dp))
-        Spacer(modifier = Modifier.height(32.dp))
-        
+        Text("Which letter represents this sign?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(130.dp))
+        SignCard(sign = step.sign, modifier = Modifier.height(140.dp))
+        Spacer(modifier = Modifier.height(120.dp))
+
+        val fourOptions = remember(step) {
+            val correct = step.sign
+            val distractors = step.options
+                .filter {
+                    it != correct &&
+                            (it.category == SignCategory.ALPHABET || it.category == SignCategory.NUMBER)
+                }
+                .shuffled()
+                .take(3)
+            (distractors + correct).shuffled()
+        }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(step.options) { option ->
+            items(fourOptions) { option ->
                 QuizOptionCard(
                     sign = option,
                     isSelected = selectedAnswer == option,
-                    onClick = { 
-                        selectedAnswer = option
-                        onComplete(true)
+                    isWrong = wrongAnswer == option,
+                    onClick = {
+                        if (wrongAnswer != option) {  // prevent re-selecting a wrong answer
+                            wrongAnswer = null
+                            selectedAnswer = option
+                        }
                     }
                 )
             }
@@ -167,8 +194,29 @@ fun QuizStepView(step: LessonStep.Quiz, onComplete: (Boolean) -> Unit) {
 @Composable
 fun MatchStepView(step: LessonStep.Match, onComplete: (Boolean) -> Unit) {
     var selectedLeft by remember { mutableStateOf<MatchPair?>(null) }
+    var selectedRight by remember { mutableStateOf<MatchPair?>(null) }
     var matches by remember { mutableStateOf(setOf<Pair<MatchPair, MatchPair>>()) }
+    var wrongLeft by remember { mutableStateOf<MatchPair?>(null) }
+    var wrongRight by remember { mutableStateOf<MatchPair?>(null) }
 
+
+    LaunchedEffect(selectedLeft, selectedRight) {
+        if (selectedLeft != null && selectedRight != null) {
+            if (selectedLeft!!.label == selectedRight!!.label) {
+                matches = matches + (selectedLeft!! to selectedRight!!)
+                selectedLeft = null
+                selectedRight = null
+            } else {
+                wrongLeft = selectedLeft
+                wrongRight = selectedRight
+                delay(600)
+                wrongLeft = null
+                wrongRight = null
+                selectedLeft = null
+                selectedRight = null
+            }
+        }
+    }
     LaunchedEffect(matches) {
         if (matches.size == step.pairs.size) {
             onComplete(true)
@@ -187,6 +235,7 @@ fun MatchStepView(step: LessonStep.Match, onComplete: (Boolean) -> Unit) {
                         text = pair.sign.label,
                         isSelected = selectedLeft == pair,
                         isMatched = isMatched,
+                        isWrong = wrongLeft == pair,
                         onClick = { if (!isMatched) selectedLeft = pair }
                     )
                 }
@@ -195,19 +244,33 @@ fun MatchStepView(step: LessonStep.Match, onComplete: (Boolean) -> Unit) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 step.pairs.shuffled(java.util.Random(42)).forEach { pair ->
                     val isMatched = matches.any { it.second == pair }
-                    MatchCard(
-                        text = pair.label,
-                        isSelected = false,
-                        isMatched = isMatched,
-                        onClick = { 
-                            if (!isMatched && selectedLeft != null) {
-                                if (selectedLeft!!.label == pair.label) {
-                                    matches = matches + (selectedLeft!! to pair)
-                                    selectedLeft = null
-                                }
-                            }
-                        }
-                    )
+                    val isSelected = selectedRight == pair
+                    val isWrong = wrongRight == pair
+                    Surface(
+                        onClick = {
+                            if (!isMatched) selectedRight = if (isSelected) null else pair
+                        },
+                        modifier = Modifier.fillMaxWidth().height(100.dp),
+                        shape = RoundedCornerShape(20.dp),
+
+                        color = when {
+                            isMatched -> SuccessGreen.copy(alpha = 0.1f)
+                            isWrong -> Color.Red.copy(alpha = 0.1f)
+                            isSelected -> PrimaryGreen.copy(alpha = 0.1f)
+                            else -> MaterialTheme.colorScheme.surface
+                        },
+                        border = BorderStroke(2.dp, when {
+                            isMatched -> SuccessGreen
+                            isWrong -> Color.Red
+                            isSelected -> PrimaryGreen
+                            else -> Color.LightGray.copy(alpha = 0.3f)
+                        })
+                    ) {
+                        SignCard(
+                            sign = pair.sign,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
         }
@@ -215,13 +278,14 @@ fun MatchStepView(step: LessonStep.Match, onComplete: (Boolean) -> Unit) {
 }
 
 @Composable
-fun MatchCard(text: String, isSelected: Boolean, isMatched: Boolean, onClick: () -> Unit) {
+fun MatchCard(text: String, isSelected: Boolean, isMatched: Boolean, isWrong: Boolean = false, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(64.dp),
+        modifier = Modifier.fillMaxWidth().height(100.dp),
         shape = RoundedCornerShape(16.dp),
         color = when {
             isMatched -> SuccessGreen.copy(alpha = 0.1f)
+            isWrong -> Color.Red.copy(alpha = 0.1f)
             isSelected -> PrimaryGreen.copy(alpha = 0.1f)
             else -> MaterialTheme.colorScheme.surface
         },
@@ -229,6 +293,7 @@ fun MatchCard(text: String, isSelected: Boolean, isMatched: Boolean, onClick: ()
             width = 2.dp,
             color = when {
                 isMatched -> SuccessGreen
+                isWrong -> Color.Red.copy(alpha = 0.1f)
                 isSelected -> PrimaryGreen
                 else -> Color.LightGray.copy(alpha = 0.3f)
             }

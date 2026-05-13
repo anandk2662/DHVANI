@@ -394,7 +394,7 @@ fun QuickPracticeSection(onQuizClick: () -> Unit) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text("Ready for a challenge?", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
-                Text("Take a quick quiz to earn extra XP", color = MaterialTheme.colorScheme.primary)
+                Text("Take a quick quiz to earn extra XP!", color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = onQuizClick,

@@ -1,5 +1,6 @@
 package com.example.dhvani.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -24,6 +25,9 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import coil.request.ImageRequest
 import com.example.dhvani.data.model.SignItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalMinimumInteractiveComponentEnforcement
+import androidx.compose.runtime.CompositionLocalProvider
 
 @Composable
 fun SignCard(
@@ -74,54 +78,54 @@ fun SignCard(
         }
     }
 }
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuizOptionCard(
     sign: SignItem,
     isSelected: Boolean,
+    isWrong: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-        shadowElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (sign.assetPath.endsWith(".mp4", ignoreCase = true)) {
-                VideoSignPlayer(
-                    assetPath = sign.assetPath,
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(8.dp))
+    CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
+        Surface(
+            onClick = onClick,
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(min = 0.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = when {
+                isWrong -> Color.Red.copy(alpha = 0.1f)
+                isSelected -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.surface
+            },
+            border = BorderStroke(2.dp, when {
+                isWrong -> Color.Red
+                isSelected -> MaterialTheme.colorScheme.primary
+                else -> Color.LightGray.copy(alpha = 0.3f)
+            }),
+            shadowElevation = 0.dp
+    )   {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+         ) {
+
+                Text(
+                    text = sign.label,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
                 )
-            } else {
-                val imagePath = "file:///android_asset/${sign.assetPath}"
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(imagePath)
-                        .build(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
+                Spacer(modifier = Modifier.weight(1f))
+
+                RadioButton(
+                    selected = isSelected || isWrong,
+                    onClick = null,
+                    colors = RadioButtonDefaults.colors(
+                        selectedColor = if (isWrong) Color.Red else MaterialTheme.colorScheme.primary
+                    )
                 )
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = sign.label,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            RadioButton(selected = isSelected, onClick = null)
         }
     }
 }
@@ -282,7 +286,7 @@ fun FullScreenSignDialog(
                         color = MaterialTheme.colorScheme.primaryContainer,
                         shape = RoundedCornerShape(24.dp)
                     ) {
-                        Column(modifier = Modifier.padding(24.dp)) {
+                        Column(modifier = Modifier.padding(20.dp)) {
                             Text(
                                 text = "Category: ${sign.category.name}",
                                 style = MaterialTheme.typography.titleMedium,

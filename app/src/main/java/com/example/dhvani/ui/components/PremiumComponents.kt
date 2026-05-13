@@ -74,7 +74,7 @@ fun GradientButton(
     }
 }
 
-@Composable
+/*@Composable
 fun AnimatedCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -105,7 +105,7 @@ fun AnimatedCard(
         content()
     }
 }
-
+*/
 @Composable
 fun PremiumTextField(
     value: String,

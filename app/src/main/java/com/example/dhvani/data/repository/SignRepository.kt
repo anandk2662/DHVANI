@@ -7,12 +7,10 @@ import com.example.dhvani.data.model.SignItem
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-
 import com.example.dhvani.data.model.*
 import com.example.dhvani.data.prefs.AppPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
 import com.example.dhvani.data.SignData
 import java.util.Locale
 
@@ -151,21 +149,26 @@ class SignRepository @Inject constructor(
 
     private fun generateStepsForSigns(signs: List<SignItem>): List<LessonStep> {
         val steps = mutableListOf<LessonStep>()
-        
+
         // 1. Learning Phase
         signs.forEach { steps.add(LessonStep.Learn(it)) }
-        
+
         // 2. Quiz Phase
         signs.forEach { sign ->
-            val options = (_allSigns - sign).shuffled().take(3) + sign
-            steps.add(LessonStep.Quiz(sign, options.shuffled()))
+            // Pick distractors from same category only (letters with letters, numbers with numbers)
+            val sameCategory = _allSigns.filter {
+                it.category == sign.category && it != sign
+            }
+            val distractors = sameCategory.shuffled().take(3)
+            val options = (distractors + sign).shuffled()
+            steps.add(LessonStep.Quiz(sign, options))
         }
-        
+
         // 3. Matching Phase
         if (signs.size >= 3) {
             steps.add(LessonStep.Match(signs.take(4).map { MatchPair(it, it.label) }))
         }
-        
+
         // 4. Camera Practice (AI)
         signs.take(2).forEach { steps.add(LessonStep.Camera(it)) }
 
