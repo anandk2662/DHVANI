@@ -50,7 +50,7 @@ fun OfflineDictionaryScreen(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Quickly reference all signs you've learned.",
+                "Quickly refer all signs you've learned.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = androidx.compose.ui.graphics.Color.Gray
             )

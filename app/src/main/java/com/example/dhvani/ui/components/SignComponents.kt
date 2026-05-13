@@ -82,16 +82,7 @@ fun QuizOptionCard(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(imagePath)
-                    .build(),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
+
             Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = sign.label,
