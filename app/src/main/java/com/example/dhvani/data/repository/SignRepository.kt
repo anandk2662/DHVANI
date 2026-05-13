@@ -183,6 +183,41 @@ class SignRepository @Inject constructor(
         createLessons()
     }
 
+    enum class QuizDifficulty { EASY, MEDIUM, HARD }
+
+    fun generateQuiz(
+        category: SignCategory,
+        count: Int = 10,
+        difficulty: QuizDifficulty = QuizDifficulty.MEDIUM
+    ): List<QuizQuestion> {
+        val categorySigns = _allSigns.filter { it.category == category }
+        if (categorySigns.isEmpty()) return emptyList()
+
+        return categorySigns.shuffled().take(count).map { correctAnswer ->
+            val distractorPool = when (category) {
+                SignCategory.ALPHABET -> _allSigns.filter { it.category == SignCategory.ALPHABET }
+                SignCategory.NUMBER -> _allSigns.filter { it.category == SignCategory.NUMBER }
+                else -> _allSigns.filter { it.category == category }
+            }
+
+            // Ensure distractors don't include the correct answer and are from the same "type"
+            val distractors = (distractorPool - correctAnswer).shuffled()
+            
+            val optionCount = when (difficulty) {
+                QuizDifficulty.EASY -> 2
+                QuizDifficulty.MEDIUM -> 4
+                QuizDifficulty.HARD -> 6
+            }
+
+            val options = (distractors.take(optionCount - 1) + correctAnswer).shuffled()
+            
+            QuizQuestion(
+                correctAnswer = correctAnswer,
+                options = options
+            )
+        }
+    }
+
     fun getAllSigns(): List<SignItem> = _allSigns
 
     fun getSignsByCategory(category: SignCategory): List<SignItem> {
@@ -197,7 +232,11 @@ class SignRepository @Inject constructor(
         if (_allSigns.isEmpty()) return emptyList()
         return List(count) {
             val correctAnswer = _allSigns.random()
-            val options = (_allSigns - correctAnswer).shuffled().take(3) + correctAnswer
+            
+            // Filter options to be within the same category (e.g., only Alphabets for an Alphabet question)
+            val sameCategorySigns = _allSigns.filter { it.category == correctAnswer.category }
+            val options = (sameCategorySigns - correctAnswer).shuffled().take(3) + correctAnswer
+
             QuizQuestion(correctAnswer, options.shuffled())
         }
     }

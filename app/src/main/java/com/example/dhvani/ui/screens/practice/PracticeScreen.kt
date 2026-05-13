@@ -33,11 +33,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.dhvani.ui.components.AnimatedCard
-import com.example.dhvani.ui.components.FloatingBottomBar
-import com.example.dhvani.ui.components.GradientButton
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.dhvani.ml.HandLandmarkerHelper
+import com.example.dhvani.ml.PredictionResult
+import com.example.dhvani.ui.components.*
 import com.example.dhvani.ui.theme.PrimaryGreen
 import com.example.dhvani.ui.theme.SuccessGreen
+import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult
 
 @Composable
 fun PracticeScreen(
@@ -58,6 +61,10 @@ fun PracticeScreen(
     val imageWidth by viewModel.imageWidth.collectAsState()
     val rotationDegrees by viewModel.rotationDegrees.collectAsState()
 
+    LaunchedEffect(Unit) {
+        viewModel.loadEncounteredSigns()
+    }
+
     var hasCameraPermission by remember { mutableStateOf(false) }
     val context = LocalContext.current
     
@@ -68,7 +75,7 @@ fun PracticeScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (androidx.core.content.ContextCompat.checkSelfPermission(
+        if (ContextCompat.checkSelfPermission(
                 context,
                 android.Manifest.permission.CAMERA
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -170,7 +177,16 @@ fun SignSelectionList(
                             color = PrimaryGreen.copy(alpha = 0.1f)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(sign.icon, fontSize = 32.sp)
+                                val imagePath = "file:///android_asset/${sign.assetPath}"
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(imagePath)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = sign.label,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                )
                             }
                         }
                         Spacer(modifier = Modifier.height(16.dp))
@@ -186,8 +202,8 @@ fun SignSelectionList(
 @Composable
 fun CameraPracticeView(
     sign: EncounteredSign,
-    predictionResult: com.example.dhvani.ml.PredictionResult?,
-    latestResult: com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult?,
+    predictionResult: PredictionResult?,
+    latestResult: HandLandmarkerResult?,
     imageHeight: Int,
     imageWidth: Int,
     rotationDegrees: Int,
@@ -201,10 +217,10 @@ fun CameraPracticeView(
     val previewView = remember { PreviewView(context).apply { 
         scaleType = PreviewView.ScaleType.FILL_CENTER
     } }
-    val overlayView = remember { com.example.dhvani.ui.components.OverlayView(context, null) }
+    val overlayView = remember { OverlayView(context, null) }
     
     val helper = remember {
-        com.example.dhvani.ml.HandLandmarkerHelper(context, viewModel)
+        HandLandmarkerHelper(context, viewModel)
     }
 
     LaunchedEffect(cameraSelector) {
@@ -272,7 +288,16 @@ fun CameraPracticeView(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(sign.icon, fontSize = 24.sp)
+                    val imagePath = "file:///android_asset/${sign.assetPath}"
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(imagePath)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = sign.label,
+                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text("Target: ${sign.label}", color = Color.White, fontWeight = FontWeight.Bold)
                 }
@@ -298,9 +323,11 @@ fun CameraPracticeView(
                     .padding(24.dp)
                     .fillMaxWidth()
             ) {
-                val isCorrect = accuracy > 0.7f
+                val prediction = predictionResult?.prediction ?: "Detecting..."
+                val isCorrect = accuracy > 0.6f && prediction.equals(sign.label, ignoreCase = true)
+                
                 AnimatedResultCard(
-                    prediction = predictionResult?.prediction ?: "Detecting...",
+                    prediction = prediction,
                     accuracy = accuracy,
                     isCorrect = isCorrect
                 )

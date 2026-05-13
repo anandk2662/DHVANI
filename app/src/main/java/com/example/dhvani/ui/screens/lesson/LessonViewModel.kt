@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.dhvani.data.model.*
 import com.example.dhvani.data.repository.SignRepository
 import com.example.dhvani.gamification.GamificationEngine
+import com.example.dhvani.data.prefs.AppPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +15,8 @@ import javax.inject.Inject
 @HiltViewModel
 class LessonViewModel @Inject constructor(
     private val signRepository: SignRepository,
-    private val gamificationEngine: GamificationEngine
+    private val gamificationEngine: GamificationEngine,
+    private val preferences: AppPreferences
 ) : ViewModel() {
 
     private val _lesson = MutableStateFlow<Lesson?>(null)
@@ -38,6 +40,26 @@ class LessonViewModel @Inject constructor(
 
     fun setStepCompleted(completed: Boolean) {
         _canGoNext.value = completed
+        
+        // Track the sign as practiced when a step is completed
+        val lesson = _lesson.value ?: return
+        val step = lesson.steps.getOrNull(_currentStepIndex.value)
+        if (completed) {
+            viewModelScope.launch {
+                val signToTrack = when (step) {
+                    is LessonStep.Quiz -> step.sign
+                    is LessonStep.Camera -> step.targetSign
+                    else -> null
+                }
+                
+                signToTrack?.let { sign ->
+                    val practiced = preferences.practicedSigns.toMutableSet()
+                    if (practiced.add(sign.id)) {
+                        preferences.practicedSigns = practiced
+                    }
+                }
+            }
+        }
     }
 
     fun nextStep() {
