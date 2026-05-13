@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
@@ -63,12 +64,23 @@ fun LoginScreen(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                "Welcome Back",
+                "Welcome Back!",
                 style = MaterialTheme.typography.headlineMedium,
                 color = Color.White
             )
         }
-
+        IconButton(
+            onClick = onBackClick,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 16.dp, start = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = Color.White
+            )
+        }
         AnimatedVisibility(
             visible = visible,
             enter = slideInVertically(initialOffsetY = { it / 4 }) + fadeIn(),
