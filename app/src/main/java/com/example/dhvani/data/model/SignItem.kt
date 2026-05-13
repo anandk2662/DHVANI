@@ -12,7 +12,25 @@ data class SignItem(
 
 enum class SignCategory {
     ALPHABET,
-    NUMBER
+    NUMBER,
+    BASICS,
+    FAMILY,
+    EMOTIONS,
+    BODY,
+    HOME,
+    FOOD,
+    ANIMALS,
+    TIME,
+    EDUCATION,
+    TECHNOLOGY,
+    TRANSPORT,
+    WORK,
+    ACTIONS,
+    COLORS,
+    GRAMMAR,
+    RELIGION,
+    SPORTS,
+    MISC
 }
 
 data class QuizQuestion(

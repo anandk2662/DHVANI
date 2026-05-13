@@ -21,11 +21,7 @@ class LearningViewModel @Inject constructor(
     val currentIndex = _currentIndex.asStateFlow()
 
     fun loadCategory(category: SignCategory) {
-        _signs.value = if (category == SignCategory.ALPHABET) {
-            repository.getAlphabets()
-        } else {
-            repository.getNumbers()
-        }
+        _signs.value = repository.getSignsByCategory(category)
         _currentIndex.value = 0
     }
 

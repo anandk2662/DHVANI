@@ -16,10 +16,13 @@ class AppPreferences @Inject constructor(
         get() = prefs.getString(KEY_AI_URL, DEFAULT_URL) ?: DEFAULT_URL
         set(value) = prefs.edit().putString(KEY_AI_URL, value).apply()
 
+    var completedLessons: Set<String>
+        get() = prefs.getStringSet(KEY_COMPLETED_LESSONS, emptySet())?.toSet() ?: emptySet()
+        set(value) = prefs.edit().putStringSet(KEY_COMPLETED_LESSONS, value).apply()
+
     companion object {
         private const val KEY_AI_URL = "ai_model_url"
-        // A placeholder Hugging Face Inference API endpoint
-        // Example: https://api-inference.huggingface.co/models/RavenOnGit/asl_sign_language_recognition
+        private const val KEY_COMPLETED_LESSONS = "completed_lessons"
         private const val DEFAULT_URL = "https://api-inference.huggingface.co/models/google/mediapipe-hand-landmarks"
     }
 }

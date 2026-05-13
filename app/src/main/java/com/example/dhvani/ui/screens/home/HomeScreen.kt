@@ -7,8 +7,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ElectricBolt
@@ -31,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.dhvani.data.model.Lesson
 import com.example.dhvani.data.model.LessonStatus
+import com.example.dhvani.data.model.SignCategory
+import com.example.dhvani.ui.components.RoadmapPath
 import com.example.dhvani.ui.components.AnimatedCard
 import com.example.dhvani.ui.components.FloatingBottomBar
 import com.example.dhvani.ui.theme.*
@@ -50,6 +56,21 @@ fun HomeScreen(
 ) {
     val lessons by viewModel.lessons.collectAsState()
     val profile by viewModel.userProfile.collectAsState()
+    
+    var selectedCurriculumTab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("Alphabets", "Beginner", "Intermediate", "Advanced")
+    
+    val filteredLessons = remember(lessons, selectedCurriculumTab) {
+        lessons.filter { lesson ->
+            when (selectedCurriculumTab) {
+                0 -> lesson.category == SignCategory.ALPHABET
+                1 -> lesson.title.contains("Beginner") && lesson.category != SignCategory.ALPHABET
+                2 -> lesson.title.contains("Intermediate")
+                3 -> lesson.title.contains("Advanced")
+                else -> true
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -101,16 +122,45 @@ fun HomeScreen(
                         fontWeight = FontWeight.Bold
                     )
                 }
+                
+                item {
+                    ScrollableTabRow(
+                        selectedTabIndex = selectedCurriculumTab,
+                        edgePadding = 24.dp,
+                        containerColor = Color.Transparent,
+                        divider = {},
+                        indicator = { tabPositions ->
+                            TabRowDefaults.SecondaryIndicator(
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[selectedCurriculumTab]),
+                                color = PrimaryGreen
+                            )
+                        }
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            Tab(
+                                selected = selectedCurriculumTab == index,
+                                onClick = { selectedCurriculumTab = index },
+                                text = { 
+                                    Text(
+                                        title,
+                                        fontWeight = if (selectedCurriculumTab == index) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-                itemsIndexed(lessons) { index, lesson ->
+                itemsIndexed(filteredLessons) { index, lesson ->
                     JourneyNode(
                         lesson = lesson,
                         isRightSide = index % 2 != 0,
                         onNodeClick = { onLessonSelected(lesson.id) }
                     )
                     
-                    if (index < lessons.size - 1) {
-                        ConnectorLine(isRightToLeft = index % 2 == 0)
+                    if (index < filteredLessons.size - 1) {
+                        RoadmapPath(isRightToLeft = index % 2 == 0)
                     }
                 }
                 
@@ -216,32 +266,39 @@ fun StatWidget(label: String, value: String, icon: ImageVector, color: Color, mo
 
 @Composable
 fun JourneyNode(lesson: Lesson, isRightSide: Boolean, onNodeClick: () -> Unit) {
-    val infiniteTransition = rememberInfiniteTransition()
+    val infiniteTransition = rememberInfiniteTransition(label = "NodeGlow")
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
         targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse)
+        animationSpec = infiniteRepeatable(tween(2000), RepeatMode.Reverse),
+        label = "Alpha"
+    )
+
+    val scale by animateFloatAsState(
+        targetValue = if (lesson.status == LessonStatus.LOCKED) 0.9f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "Scale"
     )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 48.dp),
+            .padding(horizontal = 64.dp),
         contentAlignment = if (isRightSide) Alignment.CenterEnd else Alignment.CenterStart
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
                 if (lesson.status == LessonStatus.AVAILABLE || lesson.status == LessonStatus.IN_PROGRESS) {
                     Box(
                         modifier = Modifier
-                            .size(100.dp)
+                            .size(90.dp)
                             .background(PrimaryGreen.copy(alpha = glowAlpha), CircleShape)
                     )
                 }
                 
                 Surface(
-                    onClick = onNodeClick,
-                    modifier = Modifier.size(80.dp),
+                    onClick = { if (lesson.status != LessonStatus.LOCKED) onNodeClick() },
+                    modifier = Modifier.size(80.dp * scale),
                     shape = CircleShape,
                     color = when (lesson.status) {
                         LessonStatus.COMPLETED -> PrimaryGreen
@@ -254,10 +311,29 @@ fun JourneyNode(lesson: Lesson, isRightSide: Boolean, onNodeClick: () -> Unit) {
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         if (lesson.status == LessonStatus.LOCKED) {
-                            Text("🔒", fontSize = 24.sp)
+                            Icon(Icons.Default.Star, contentDescription = null, tint = Color.Gray.copy(alpha = 0.5f))
                         } else {
-                            Text(if (lesson.category == com.example.dhvani.data.model.SignCategory.ALPHABET) "A" else "1", 
-                                fontSize = 32.sp, 
+                            val icon = when (lesson.category) {
+                                SignCategory.ALPHABET -> "A"
+                                SignCategory.NUMBER -> "1"
+                                SignCategory.BASICS -> "💬"
+                                SignCategory.FAMILY -> "👪"
+                                SignCategory.EMOTIONS -> "😊"
+                                SignCategory.BODY -> "💪"
+                                SignCategory.HOME -> "🏠"
+                                SignCategory.FOOD -> "🍕"
+                                SignCategory.ANIMALS -> "🐾"
+                                SignCategory.TIME -> "⏰"
+                                SignCategory.EDUCATION -> "📚"
+                                SignCategory.TECHNOLOGY -> "💻"
+                                SignCategory.TRANSPORT -> "🚌"
+                                SignCategory.WORK -> "💼"
+                                SignCategory.ACTIONS -> "🏃"
+                                SignCategory.COLORS -> "🎨"
+                                else -> "✨"
+                            }
+                            Text(icon, 
+                                fontSize = if (icon.length > 1) 32.sp else 36.sp, 
                                 fontWeight = FontWeight.Bold,
                                 color = if (lesson.status == LessonStatus.COMPLETED) Color.White else PrimaryGreen
                             )
@@ -266,12 +342,19 @@ fun JourneyNode(lesson: Lesson, isRightSide: Boolean, onNodeClick: () -> Unit) {
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                lesson.title,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (lesson.status == LessonStatus.LOCKED) Color.Gray else Color.Unspecified
-            )
+            Surface(
+                color = if (lesson.status == LessonStatus.LOCKED) Color.Transparent else MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp),
+                shadowElevation = if (lesson.status == LessonStatus.LOCKED) 0.dp else 2.dp
+            ) {
+                Text(
+                    lesson.title,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (lesson.status == LessonStatus.LOCKED) Color.Gray else MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 }

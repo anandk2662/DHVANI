@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -90,19 +91,17 @@ fun ProfileScreen(
                             }
                             SettingsItem(Icons.AutoMirrored.Filled.Help, "Help Center") {}
                             
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             
-                            Button(
-                                onClick = { 
-                                    viewModel.logout {
-                                        onLogoutSuccess()
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = ErrorRed.copy(alpha = 0.1f)),
-                                shape = RoundedCornerShape(16.dp)
+                            SettingsItem(
+                                icon = Icons.AutoMirrored.Filled.Logout,
+                                label = "Log Out",
+                                textColor = ErrorRed,
+                                iconColor = ErrorRed
                             ) {
-                                Text("Log Out", color = ErrorRed, fontWeight = FontWeight.Bold)
+                                viewModel.logout {
+                                    onLogoutSuccess()
+                                }
                             }
                         }
                     }
@@ -222,7 +221,13 @@ fun StatCard(label: String, value: String, icon: ImageVector, color: Color, modi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+fun SettingsItem(
+    icon: ImageVector,
+    label: String,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
+    iconColor: Color = MaterialTheme.colorScheme.primary,
+    onClick: () -> Unit
+) {
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -233,9 +238,9 @@ fun SettingsItem(icon: ImageVector, label: String, onClick: () -> Unit) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(icon, contentDescription = null, tint = iconColor)
             Spacer(modifier = Modifier.width(16.dp))
-            Text(label, fontWeight = FontWeight.Medium)
+            Text(label, fontWeight = FontWeight.Medium, color = textColor)
             Spacer(modifier = Modifier.weight(1f))
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = Color.LightGray)
         }

@@ -90,6 +90,11 @@ dependencies {
     implementation(libs.mediapipe.vision)
     implementation(libs.tensorflow.lite)
 
+    // Media3
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+    implementation(libs.androidx.media3.common)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
@@ -98,6 +103,9 @@ dependencies {
 
     // Security
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

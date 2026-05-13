@@ -122,6 +122,13 @@ class AuthRepository @Inject constructor(
         supabaseClient.auth.signInWith(Google, redirectUrl = "com.example.dhvani://login-callback")
     }
 
+    suspend fun signInWithIdToken(idToken: String) {
+        supabaseClient.auth.signInWith(io.github.jan.supabase.auth.providers.builtin.IDToken) {
+            this.idToken = idToken
+            this.provider = Google
+        }
+    }
+
     suspend fun signOut() {
         supabaseClient.auth.signOut()
         _currentUserProfile.value = null

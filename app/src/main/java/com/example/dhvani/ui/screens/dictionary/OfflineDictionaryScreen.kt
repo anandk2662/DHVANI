@@ -14,6 +14,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.dhvani.ui.components.DictionaryItemCard
 import com.example.dhvani.ui.components.FloatingBottomBar
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+
 @Composable
 fun OfflineDictionaryScreen(
     onHomeClick: () -> Unit,
@@ -23,7 +32,14 @@ fun OfflineDictionaryScreen(
     onLeaderboardClick: () -> Unit,
     viewModel: DictionaryViewModel = hiltViewModel()
 ) {
+    var searchQuery by remember { mutableStateOf("") }
     val allSigns by viewModel.allSigns.collectAsState()
+    
+    val filteredSigns = if (searchQuery.isEmpty()) {
+        allSigns
+    } else {
+        allSigns.filter { it.label.contains(searchQuery, ignoreCase = true) }
+    }
 
     Scaffold(
         bottomBar = {
@@ -49,10 +65,23 @@ fun OfflineDictionaryScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
-            Text(
-                "Quickly refer all signs you've learned.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = androidx.compose.ui.graphics.Color.Gray
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            TextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(16.dp)),
+                placeholder = { Text("Search 2000+ signs...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                shape = RoundedCornerShape(16.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent
+                )
             )
             
             Spacer(modifier = Modifier.height(24.dp))
@@ -62,7 +91,7 @@ fun OfflineDictionaryScreen(
                 contentPadding = PaddingValues(bottom = 100.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(allSigns) { sign ->
+                items(filteredSigns) { sign ->
                     DictionaryItemCard(sign = sign)
                 }
             }
